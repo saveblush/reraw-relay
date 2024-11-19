@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
@@ -49,15 +50,14 @@ func (s *service) FindAll(c *cctx.Context, req *Request) ([]*nostr.Event, error)
 }
 
 func (s *service) FindByID(c *cctx.Context, ID string) (*nostr.Event, error) {
-	fetch := &models.RelayEvent{}
-	err := s.repository.FindOneObjectByIDString(c.GetRelayDatabase(), "id", ID, fetch)
+	fetch, err := s.repository.FindByID(c.GetRelayDatabase(), ID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 
 	res := &nostr.Event{}
 	if !generic.IsEmpty(fetch) {
-		generic.ConvertInterfaceToStruct(fetch, res)
+		copier.Copy(res, fetch)
 	}
 
 	return res, nil

@@ -6,39 +6,36 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
 	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/models"
-	"github.com/saveblush/reraw-relay/pgk/repositories"
 )
 
 // repository interface
 type Repository interface {
 	Find(db *gorm.DB, req *Request) (*nostr.Event, error)
 	FindAll(db *gorm.DB, req *Request) ([]*nostr.Event, error)
-	FindOneObjectByIDString(db *gorm.DB, field string, value string, i interface{}) error
+	FindByID(db *gorm.DB, ID string) (*models.RelayEvent, error)
 	Count(db *gorm.DB, req *Request) (*int64, error)
 	Insert(db *gorm.DB, req *models.RelayEvent) error
 	SoftDelete(db *gorm.DB, req *models.RelayEvent) error
-	Delete(db *gorm.DB, i interface{}) error
+	Delete(db *gorm.DB, req *models.RelayEvent) error
 	InsertBlacklist(db *gorm.DB, req *models.Blacklist) error
 	FindBlacklists(db *gorm.DB, req *models.Blacklist) ([]*models.Blacklist, error)
 }
 
 type repository struct {
-	repositories.Repository
 }
 
 func NewRepository() Repository {
-	return &repository{
-		repositories.NewRepository(),
-	}
+	return &repository{}
 }
 
-func makePlaceHolders(n int) string {
+func makePlaceParams(n int) string {
 	return strings.TrimRight(strings.Repeat("?,", n), ",")
 }
 
@@ -54,21 +51,21 @@ func (r *repository) query(req *Request) (string, []any, error) {
 		for _, v := range req.NostrFilter.IDs {
 			params = append(params, v)
 		}
-		conditions = append(conditions, `id IN (`+makePlaceHolders(len(req.NostrFilter.IDs))+`)`)
+		conditions = append(conditions, `id IN (`+makePlaceParams(len(req.NostrFilter.IDs))+`)`)
 	}
 
 	if !generic.IsEmpty(req.NostrFilter.Authors) {
 		for _, v := range req.NostrFilter.Authors {
 			params = append(params, v)
 		}
-		conditions = append(conditions, `pubkey IN (`+makePlaceHolders(len(req.NostrFilter.Authors))+`)`)
+		conditions = append(conditions, `pubkey IN (`+makePlaceParams(len(req.NostrFilter.Authors))+`)`)
 	}
 
 	if !generic.IsEmpty(req.NostrFilter.Kinds) {
 		for _, v := range req.NostrFilter.Kinds {
 			params = append(params, v)
 		}
-		conditions = append(conditions, `kind IN (`+makePlaceHolders(len(req.NostrFilter.Kinds))+`)`)
+		conditions = append(conditions, `kind IN (`+makePlaceParams(len(req.NostrFilter.Kinds))+`)`)
 	}
 
 	if !generic.IsEmpty(req.NostrFilter.Since) {
@@ -96,7 +93,7 @@ func (r *repository) query(req *Request) (string, []any, error) {
 		for _, tagValue := range tagQuery {
 			params = append(params, tagValue)
 		}
-		conditions = append(conditions, `tagvalues && ARRAY[`+makePlaceHolders(len(tagQuery))+`]`)
+		conditions = append(conditions, `tagvalues && ARRAY[`+makePlaceParams(len(tagQuery))+`]`)
 	}
 
 	if len(conditions) == 0 {
@@ -176,7 +173,17 @@ func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*nostr.Event, error) 
 	}
 
 	entities := []*nostr.Event{}
-	generic.ConvertInterfaceToStruct(v, &entities)
+	copier.Copy(&entities, &v)
+
+	return entities, nil
+}
+
+func (r *repository) FindByID(db *gorm.DB, ID string) (*models.RelayEvent, error) {
+	entities := &models.RelayEvent{}
+	err := db.Where("id = ?", ID).First(entities).Error
+	if err != nil {
+		return nil, err
+	}
 
 	return entities, nil
 }
@@ -225,6 +232,15 @@ func (r *repository) Insert(db *gorm.DB, req *models.RelayEvent) error {
 
 func (r *repository) SoftDelete(db *gorm.DB, req *models.RelayEvent) error {
 	err := db.Model(&req).Select("DeletedAt").Updates(&models.RelayEvent{DeletedAt: nostr.Timestamp(utils.Now().Unix())}).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *repository) Delete(db *gorm.DB, req *models.RelayEvent) error {
+	err := db.Delete(&req).Error
 	if err != nil {
 		return err
 	}

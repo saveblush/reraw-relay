@@ -9,12 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jinzhu/copier"
 	"github.com/lesismal/nbio/nbhttp"
 	"github.com/nbd-wtf/go-nostr/nip11"
 	"github.com/rs/cors"
 
 	"github.com/saveblush/reraw-relay/core/config"
-	"github.com/saveblush/reraw-relay/core/generic"
 	"github.com/saveblush/reraw-relay/core/sql"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 	"github.com/saveblush/reraw-relay/pgk/cron"
@@ -75,7 +75,7 @@ func main() {
 
 	// Init relay
 	nip11 := &nip11.RelayInformationDocument{}
-	generic.ConvertInterfaceToStruct(config.CF.Info, nip11)
+	copier.Copy(nip11, &config.CF.Info)
 	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
 		KeepaliveTime:      Timeout45s,

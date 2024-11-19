@@ -5,8 +5,9 @@ go 1.23.1
 require (
 	github.com/bytedance/sonic v1.12.4
 	github.com/fsnotify/fsnotify v1.8.0
+	github.com/jinzhu/copier v0.4.0
 	github.com/lesismal/nbio v1.5.12
-	github.com/nbd-wtf/go-nostr v0.42.0
+	github.com/nbd-wtf/go-nostr v0.42.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/cors v1.11.1
 	github.com/samber/lo v1.47.0
