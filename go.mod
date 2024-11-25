@@ -3,17 +3,16 @@ module github.com/saveblush/reraw-relay
 go 1.23.1
 
 require (
-	github.com/bytedance/sonic v1.12.4
+	github.com/bytedance/sonic v1.12.5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/lesismal/nbio v1.5.12
 	github.com/nbd-wtf/go-nostr v0.42.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/cors v1.11.1
-	github.com/samber/lo v1.47.0
 	github.com/spf13/viper v1.19.0
 	go.uber.org/zap v1.27.0
-	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/postgres v1.5.10
 	gorm.io/gorm v1.25.12
 )
 
