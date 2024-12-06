@@ -29,8 +29,8 @@ var (
 )
 
 var (
-	pingInterval = time.Second * 5
-	pingWait     = time.Second * 10
+	pingInterval = time.Second * 15
+	pingWait     = time.Second * 20
 )
 
 type StoreEvent []func(cctx *cctx.Context, evt *nostr.Event) error
@@ -159,7 +159,7 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			_ = c.WriteMessage(websocket.PongMessage, nil)
 			return
 		}
-		c.SetReadDeadline(time.Now().Add(time.Second * 15))
+		c.SetReadDeadline(time.Now().Add(time.Second * 20))
 
 		// event nostr
 		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)

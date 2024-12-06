@@ -24,6 +24,7 @@ import (
 const (
 	// MaximumSize body limit
 	MaximumSize10MB = 1024 * 1024 * 10
+	MaximumSize4MB  = 1024 * 1024 * 4
 	MaximumSize1MB  = 1024 * 1024 * 1
 
 	// Timeout
@@ -78,8 +79,8 @@ func main() {
 	copier.Copy(nip11, &config.CF.Info)
 	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
-		KeepaliveTime:      Timeout45s,
-		HandshakeTimeout:   Timeout30s,
+		KeepaliveTime:      Timeout60s,
+		HandshakeTimeout:   Timeout45s,
 		MessageLengthLimit: MaximumSize1MB,
 	})
 
@@ -92,9 +93,9 @@ func main() {
 		Name:                    config.CF.Info.Name,
 		Network:                 "tcp",
 		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		ReadLimit:               MaximumSize1MB,
-		MaxHTTPBodySize:         MaximumSize1MB,
-		WriteTimeout:            Timeout10s,
+		ReadLimit:               MaximumSize4MB,
+		MaxHTTPBodySize:         MaximumSize4MB,
+		WriteTimeout:            Timeout20s,
 		KeepaliveTime:           Timeout60s,
 		ReleaseWebsocketPayload: true,
 		IOMod:                   nbhttp.IOModBlocking,
