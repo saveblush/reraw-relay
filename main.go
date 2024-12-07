@@ -90,20 +90,17 @@ func main() {
 
 	// Init app
 	engine := nbhttp.NewEngine(nbhttp.Config{
-		Name:    config.CF.Info.Name,
-		Network: "tcp",
-		Addrs:   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		//MaxLoad: 1000000,
-		//ReadLimit:               MaximumSize4MB,
-		//MaxHTTPBodySize:         MaximumSize4MB,
-		//WriteTimeout:            Timeout20s,
-		//KeepaliveTime:           Timeout60s,
+		Name:                    config.CF.Info.Name,
+		Network:                 "tcp",
+		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
+		ReadLimit:               MaximumSize4MB,
+		MaxHTTPBodySize:         MaximumSize4MB,
+		WriteTimeout:            Timeout20s,
+		KeepaliveTime:           Timeout60s,
 		ReleaseWebsocketPayload: true,
-		//IOMod:                   nbhttp.IOModBlocking,
-		//IOMod:             nbhttp.IOModMixed,
-		//MaxBlockingOnline: 100000,
-		MessageHandlerPoolSize: 16,
-		Handler:                cors.Default().Handler(mux),
+		IOMod:                   nbhttp.IOModMixed,
+		MessageHandlerPoolSize:  16,
+		Handler:                 cors.Default().Handler(mux),
 	})
 
 	// Start app
