@@ -93,16 +93,16 @@ func main() {
 		Name:    config.CF.Info.Name,
 		Network: "tcp",
 		Addrs:   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		MaxLoad: 1000000,
+		//MaxLoad: 1000000,
 		//ReadLimit:               MaximumSize4MB,
 		//MaxHTTPBodySize:         MaximumSize4MB,
 		//WriteTimeout:            Timeout20s,
 		//KeepaliveTime:           Timeout60s,
-		ReleaseWebsocketPayload: true,
+		//ReleaseWebsocketPayload: true,
 		//IOMod:                   nbhttp.IOModBlocking,
-		IOMod:             nbhttp.IOModMixed,
-		MaxBlockingOnline: 100000,
-		Handler:           cors.Default().Handler(mux),
+		//IOMod:             nbhttp.IOModMixed,
+		//MaxBlockingOnline: 100000,
+		Handler: cors.Default().Handler(mux),
 	})
 
 	// Start app
