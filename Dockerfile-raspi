@@ -15,11 +15,10 @@ FROM base AS builder
 #  --no-create-home \
 #  --uid 65532 \
 #  gouser
-RUN echo "gouser:x:19998:1000:Gouser,,,:/nonexistent:/sbin/nologin" > /etc_passwd
 
 ## Change ownership
 RUN mkdir /app
-RUN chown gouser:gouser /app
+#RUN chown gouser:gouser /app
 
 ## Set working directory
 WORKDIR /app
@@ -37,6 +36,8 @@ COPY . .
 ## Build app
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix cgo -ldflags="-w -s" -o main .
 
+RUN echo "gouser:x:19998:1000:Gouser,,,:/nonexistent:/sbin/nologin" > /etc_passwd
+
 
 # Production
 FROM scratch AS runner
@@ -53,7 +54,7 @@ USER gouser
 
 ## Copy app
 COPY --from=builder /app/main .
-COPY --from=builder --chown=gouser:gouser /app/configs ./configs
+COPY --from=builder /app/configs ./configs
 
 ENV TZ=Asia/Bangkok
 
