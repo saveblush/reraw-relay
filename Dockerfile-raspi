@@ -7,14 +7,15 @@ FROM golang:${GO_VERSION}-bullseye AS base
 FROM base AS builder
 
 ## Create user
-RUN adduser \
-  --disabled-password \
-  --gecos "" \
-  --home "/nonexistent" \
-  --shell "/sbin/nologin" \
-  --no-create-home \
-  --uid 65532 \
-  gouser
+#RUN adduser \
+#  --disabled-password \
+#  --gecos "" \
+#  --home "/nonexistent" \
+#  --shell "/sbin/nologin" \
+#  --no-create-home \
+#  --uid 65532 \
+#  gouser
+RUN echo "gouser:x:19998:1000:Gouser,,,:/nonexistent:/sbin/nologin" > /etc_passwd
 
 ## Change ownership
 RUN mkdir /app
@@ -44,8 +45,9 @@ WORKDIR /app
 ## Copy os bundle
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /etc/passwd /etc/passwd
-COPY --from=builder /etc/group /etc/group
+#COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc_passwd /etc/passwd
+#COPY --from=builder /etc/group /etc/group
 
 USER gouser
 
