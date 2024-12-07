@@ -98,11 +98,12 @@ func main() {
 		//MaxHTTPBodySize:         MaximumSize4MB,
 		//WriteTimeout:            Timeout20s,
 		//KeepaliveTime:           Timeout60s,
-		//ReleaseWebsocketPayload: true,
+		ReleaseWebsocketPayload: true,
 		//IOMod:                   nbhttp.IOModBlocking,
 		//IOMod:             nbhttp.IOModMixed,
 		//MaxBlockingOnline: 100000,
-		Handler: cors.Default().Handler(mux),
+		MessageHandlerPoolSize: 16,
+		Handler:                cors.Default().Handler(mux),
 	})
 
 	// Start app

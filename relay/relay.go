@@ -119,7 +119,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 		upgrader.MessageLengthLimit = rl.MessageLengthLimit
 	}
 
-	upgrader.OnOpen(func(c *websocket.Conn) {
+	/*upgrader.OnOpen(func(c *websocket.Conn) {
 		logger.Log().Info("onOpen: ", c.RemoteAddr().String())
 
 		_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
@@ -135,7 +135,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 		rl.clientsMutex.Lock()
 		delete(rl.clients, c)
 		rl.clientsMutex.Unlock()
-	})
+	})*/
 
 	return upgrader
 }
@@ -159,7 +159,7 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			_ = c.WriteMessage(websocket.PongMessage, nil)
 			return
 		}
-		c.SetReadDeadline(time.Now().Add(time.Second * 20))
+		//c.SetReadDeadline(time.Now().Add(time.Second * 20))
 
 		// event nostr
 		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
