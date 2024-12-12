@@ -11,7 +11,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    if: github.event_name == 'push'
+    
     env:
       IMAGE_NAME: reraw-relay
       VERSION: latest

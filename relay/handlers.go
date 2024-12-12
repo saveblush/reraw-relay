@@ -57,7 +57,8 @@ func (s *service) handleEvent(msg []byte) error {
 		_ = s.responseError(errInvalidMessage.Error())
 		return errInvalidMessage
 	}
-	logger.Log().Info("parse msg: ", envelope)
+	//logger.Log().Info("parse msg: ", envelope)
+	logger.Log().Info("parse msg... ok")
 
 	switch env := envelope.(type) {
 	case *nostr.EventEnvelope:

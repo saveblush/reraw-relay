@@ -80,7 +80,7 @@ func main() {
 	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
 		KeepaliveTime:      Timeout60s,
-		HandshakeTimeout:   Timeout45s,
+		HandshakeTimeout:   Timeout60s,
 		MessageLengthLimit: MaximumSize1MB,
 	})
 
@@ -93,8 +93,8 @@ func main() {
 		Name:                    config.CF.Info.Name,
 		Network:                 "tcp",
 		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		ReadLimit:               MaximumSize4MB,
-		MaxHTTPBodySize:         MaximumSize4MB,
+		ReadLimit:               MaximumSize1MB,
+		MaxHTTPBodySize:         MaximumSize1MB,
 		WriteTimeout:            Timeout20s,
 		KeepaliveTime:           Timeout60s,
 		ReleaseWebsocketPayload: true,

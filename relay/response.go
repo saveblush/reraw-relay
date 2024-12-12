@@ -21,7 +21,8 @@ func (s *service) response(v interface{}) error {
 		logger.Log().Errorf("write msg error: %s", err)
 		return err
 	}
-	logger.Log().Info("response msg: ", v)
+	//logger.Log().Info("response msg: ", v)
+	logger.Log().Info("response msg... ok")
 
 	return nil
 }
