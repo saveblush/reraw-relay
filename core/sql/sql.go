@@ -6,8 +6,6 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"github.com/saveblush/reraw-relay/core/generic"
 )
 
 var (
@@ -23,10 +21,10 @@ var (
 
 // gorm config
 var defaultConfig = &gorm.Config{
-	PrepareStmt:          true,
+	//PrepareStmt:          true,
 	DisableAutomaticPing: true,
-	QueryFields:          true,
-	Logger:               logger.Default.LogMode(logger.Error),
+	//QueryFields:          true,
+	Logger: logger.Default.LogMode(logger.Error),
 }
 
 // Session session
@@ -65,13 +63,13 @@ func InitConnection(cf *Configuration) (*Session, error) {
 	}
 
 	// set config connection pool
-	if generic.IsEmpty(cf.MaxIdleConns) {
+	if cf.MaxIdleConns > 0 {
 		cf.MaxIdleConns = defaultMaxIdleConns
 	}
-	if generic.IsEmpty(cf.MaxOpenConns) {
+	if cf.MaxOpenConns > 0 {
 		cf.MaxOpenConns = defaultMaxOpenConns
 	}
-	if generic.IsEmpty(cf.MaxLifetime) {
+	if cf.MaxLifetime > 0 {
 		cf.MaxLifetime = defaultMaxLifetime
 	}
 

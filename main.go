@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/gofiber/fiber/v3"
 	"github.com/jinzhu/copier"
+	"github.com/lesismal/nbio/nbhttp"
 	"github.com/nbd-wtf/go-nostr/nip11"
+	"github.com/rs/cors"
 
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/sql"
@@ -72,25 +74,45 @@ func main() {
 	// Migration db
 	_ = sql.Migration(sql.RelayDatabase)
 
-	// Cron
-	cron := cron.NewService()
-	cron.Start()
-
-	// Start app
-	//app := relay.NewServer()
-
 	// Init relay
 	nip11 := &nip11.RelayInformationDocument{}
 	copier.Copy(nip11, &config.CF.Info)
-	app, _ := relay.NewRelay(&relay.Relay{
-		//App:                app,
+	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
 		KeepaliveTime:      Timeout60s,
-		HandshakeTimeout:   Timeout45s,
+		HandshakeTimeout:   Timeout60s,
 		MessageLengthLimit: MaximumSize1MB,
 	})
-	//app.Get("/", rl.IsWebSocketUpgrade())
-	//app.Get("/", rl.HandleWebsocket())
+
+	// Init server
+	mux := &http.ServeMux{}
+	mux.HandleFunc("/", rl.HandleWebsocket)
+
+	// Init app
+	engine := nbhttp.NewEngine(nbhttp.Config{
+		Name:                    config.CF.Info.Name,
+		Network:                 "tcp",
+		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
+		ReadLimit:               MaximumSize1MB,
+		MaxHTTPBodySize:         MaximumSize1MB,
+		WriteTimeout:            Timeout20s,
+		KeepaliveTime:           Timeout60s,
+		ReleaseWebsocketPayload: true,
+		IOMod:                   nbhttp.IOModMixed,
+		MessageHandlerPoolSize:  16,
+		Handler:                 cors.Default().Handler(mux),
+	})
+
+	// Start app
+	err = engine.Start()
+	if err != nil {
+		logger.Log().Fatalf("app start error: %s", err)
+		return
+	}
+
+	// Cron
+	cron := cron.NewService()
+	cron.Start()
 
 	// Shutdown app
 	exit, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -99,25 +121,21 @@ func main() {
 	go func() {
 		<-exit.Done()
 		logger.Log().Info("Gracefully shutting down...")
-		_ = app.ShutdownWithContext(exit)
+		ctx, cancel := context.WithTimeout(context.Background(), Timeout5s)
+		defer cancel()
+
+		// Shutdown engine
+		engine.Shutdown(ctx)
 		serverShutdown <- struct{}{}
 	}()
-
-	// Listen app
-	listenConfig := fiber.ListenConfig{}
-	err = app.Listen(fmt.Sprintf(":%d", config.CF.App.Port), listenConfig)
-	if err != nil {
-		logger.Log().Panic(err)
-	}
-	logger.Log().Infof("Start server on port: %d ...", config.CF.App.Port)
 
 	// Cleanup tasks
 	<-serverShutdown
 	logger.Log().Info("Running cleanup tasks...")
 
 	// Close relay
-	//go rl.CloseRelay()
-	//logger.Log().Info("Relay closed")
+	go rl.CloseRelay()
+	logger.Log().Info("Relay closed")
 
 	// Close cron
 	go cron.Stop()
