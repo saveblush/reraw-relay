@@ -21,7 +21,7 @@ var (
 
 // gorm config
 var defaultConfig = &gorm.Config{
-	//PrepareStmt:          true,
+	PrepareStmt:          true,
 	DisableAutomaticPing: true,
 	//QueryFields:          true,
 	Logger: logger.Default.LogMode(logger.Error),
