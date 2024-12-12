@@ -22,7 +22,7 @@ func (s *service) response(v interface{}) error {
 		return err
 	}
 	//logger.Log().Info("response msg: ", v)
-	logger.Log().Info("response msg... ok")
+	//logger.Log().Info("response msg... ok")
 
 	return nil
 }
