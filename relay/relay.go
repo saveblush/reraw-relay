@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -203,7 +202,7 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 	supportedNIPs := rl.Info.SupportedNIPs
 	arrSupportedNIPs := make([]string, len(supportedNIPs))
 	for i, v := range supportedNIPs {
-		arrSupportedNIPs[i] = strconv.Itoa(v)
+		arrSupportedNIPs[i] = fmt.Sprintf("%v", v)
 	}
 
 	var str []string

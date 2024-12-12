@@ -7,12 +7,12 @@ require (
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/jinzhu/copier v0.4.0
 	github.com/lesismal/nbio v1.5.12
-	github.com/nbd-wtf/go-nostr v0.42.2
+	github.com/nbd-wtf/go-nostr v0.44.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/viper v1.19.0
 	go.uber.org/zap v1.27.0
-	gorm.io/driver/postgres v1.5.10
+	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.25.12
 )
 
@@ -35,11 +35,14 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/lesismal/llib v1.1.13 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
+	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.4.0 // indirect
 	github.com/sagikazarmark/locafero v0.6.0 // indirect
