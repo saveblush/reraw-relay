@@ -1,8 +1,8 @@
 package relay
 
 import (
+	"github.com/lesismal/nbio/nbhttp/websocket"
 	"github.com/nbd-wtf/go-nostr"
-	"github.com/saveblush/gofiber3-contrib/websocket"
 
 	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
