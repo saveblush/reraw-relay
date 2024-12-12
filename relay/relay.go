@@ -2,19 +2,16 @@ package relay
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/lesismal/nbio/nbhttp/websocket"
+	"github.com/gofiber/fiber/v3"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
+	"github.com/saveblush/gofiber3-contrib/websocket"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
-	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
@@ -52,166 +49,86 @@ type Relay struct {
 }
 
 // NewRelay new relay
-func NewRelay(rl *Relay) *Relay {
+func NewRelay(rl *Relay) (app *fiber.App, relay *Relay) {
+	srv := NewServer()
+	srv.Get("/", rl.HandleWebsocket())
+
 	rl.clients = make(map[*websocket.Conn][]string)
 	rl.policies = policies.NewService()
 
-	return rl
+	return srv, rl
 }
 
-// CloseRelay close relay
-func (rl *Relay) CloseRelay() error {
-	rl.clientsMutex.Lock()
-	defer rl.clientsMutex.Unlock()
-
-	for c := range rl.clients {
-		c.WriteClose(1000, "normal close")
-		c.Close()
-	}
-	clear(rl.clients)
-
-	return nil
-}
+const (
+	// MaximumSize10MB body limit 1 mb.
+	MaximumSize10MB = 10 * 1024 * 1024
+	// MaximumSize1MB body limit 1 mb.
+	MaximumSize1MB = 1 * 1024 * 1024
+	// Timeout timeout 15 seconds
+	Timeout15s = 15 * time.Second
+	// Timeout timeout 10 seconds
+	Timeout10s = 10 * time.Second
+	// Timeout timeout 5 seconds
+	Timeout5s = 5 * time.Second
+)
 
 // HandleWebsocket handle websocket
-func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
-	// check reject
-	rejectConnection := append(RejectConnection{}, rl.policies.RejectEmptyHeaderUserAgent)
-	for _, rejectFunc := range rejectConnection {
-		if rejectFunc(r) {
-			return
+func (rl *Relay) HandleWebsocket() fiber.Handler {
+	return websocket.New(func(conn *websocket.Conn) {
+		conn.EnableWriteCompression(true)
+		conn.SetCompressionLevel(2)
+		conn.SetReadLimit(int64(rl.MessageLengthLimit))
+		conn.SetReadDeadline(time.Now().Add(time.Second * 20))
+
+		for {
+			mt, msg, err := conn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(
+					err,
+					websocket.CloseNormalClosure,    // 1000
+					websocket.CloseGoingAway,        // 1001
+					websocket.CloseNoStatusReceived, // 1005
+					websocket.CloseAbnormalClosure,  // 1006
+				) {
+					logger.Log().Errorf("read msg error: %s", err)
+				}
+				break
+			}
+
+			if mt != websocket.TextMessage {
+				logger.Log().Errorf("%s is sending non-UTF-8 data. disconnecting....", conn.IP)
+				_ = conn.Close()
+				return
+			} else if mt == websocket.PingMessage {
+				_ = conn.WriteMessage(websocket.PongMessage, nil)
+				continue
+			}
+
+			// event nostr
+			storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
+			rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
+			rejectEvent := append(RejectEvent{},
+				rl.policies.RejectValidateEvent,
+				rl.policies.RejectValidatePow,
+				rl.policies.RejectValidateTimeStamp,
+				rl.policies.RejectEventFromPubkeyWithBlacklist,
+				rl.policies.RejectEventWithCharacter)
+
+			sess := &session{
+				Ws:           conn,
+				StoreEvent:   storeEvent,
+				RejectFilter: rejectFilter,
+				RejectEvent:  rejectEvent,
+			}
+			rt := newHandleEvent(sess)
+			err = rt.handleEvent(msg)
+			if err != nil {
+				logger.Log().Errorf("handle event error: %s", err)
+				return
+			}
 		}
-	}
-
-	if r.Method == http.MethodGet && r.Header.Get("Upgrade") == "websocket" {
-		rl.handleMessage(w, r)
-	} else {
-		if len(r.Header.Get("Upgrade")) > 0 {
-			http.Error(w, "Invalid Upgrade Header", http.StatusBadRequest)
-			return
-		}
-
-		if strings.Contains(r.Header.Get("Accept"), "application/nostr+json") {
-			rl.showNIP11(w)
-		} else {
-			rl.showInfo(w)
-		}
-	}
-}
-
-// newUpgrader new upgrader
-func (rl *Relay) newUpgrader() *websocket.Upgrader {
-	upgrader := websocket.NewUpgrader()
-	upgrader.EnableCompression(true)
-	upgrader.SetCompressionLevel(2)
-	upgrader.BlockingModAsyncWrite = true
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
-
-	if rl.HandshakeTimeout > 0 {
-		upgrader.HandshakeTimeout = rl.HandshakeTimeout
-	}
-
-	if rl.KeepaliveTime > 0 {
-		upgrader.KeepaliveTime = rl.KeepaliveTime
-	}
-
-	if rl.MessageLengthLimit > 0 {
-		upgrader.MessageLengthLimit = rl.MessageLengthLimit
-	}
-
-	upgrader.OnOpen(func(c *websocket.Conn) {
-		logger.Log().Info("onOpen: ", c.RemoteAddr().String())
-
-		_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
-
-		rl.clientsMutex.Lock()
-		rl.clients[c] = make([]string, 0, 2)
-		rl.clientsMutex.Unlock()
+	}, websocket.Config{
+		HandshakeTimeout:  rl.HandshakeTimeout,
+		EnableCompression: true,
 	})
-
-	upgrader.OnClose(func(c *websocket.Conn, err error) {
-		logger.Log().Info("onClose: ", c.RemoteAddr().String(), err)
-
-		rl.clientsMutex.Lock()
-		delete(rl.clients, c)
-		rl.clientsMutex.Unlock()
-	})
-
-	return upgrader
-}
-
-// HandleMessage handle message
-func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
-	upgrader := rl.newUpgrader()
-	up, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		logger.Log().Panicf("upgrader error: %s", err)
-	}
-
-	// set event reject
-	up.OnMessage(func(c *websocket.Conn, mt websocket.MessageType, msg []byte) {
-		if mt != websocket.TextMessage {
-			logger.Log().Error("message is not UTF-8. disconnecting...")
-			_ = c.Close()
-			return
-		} else if mt == websocket.PingMessage {
-			_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
-			_ = c.WriteMessage(websocket.PongMessage, nil)
-			return
-		}
-		c.SetReadDeadline(time.Now().Add(time.Second * 20))
-
-		// event nostr
-		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
-		rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
-		rejectEvent := append(RejectEvent{},
-			rl.policies.RejectValidateEvent,
-			rl.policies.RejectValidatePow,
-			rl.policies.RejectValidateTimeStamp,
-			rl.policies.RejectEventFromPubkeyWithBlacklist,
-			rl.policies.RejectEventWithCharacter)
-
-		sess := &session{
-			Ws:           c,
-			StoreEvent:   storeEvent,
-			RejectFilter: rejectFilter,
-			RejectEvent:  rejectEvent,
-		}
-		rt := newHandleEvent(sess)
-		err := rt.handleEvent(msg)
-		if err != nil {
-			logger.Log().Errorf("handle event error: %s", err)
-			return
-		}
-	})
-}
-
-// showNIP11 show nip11 info
-func (rl *Relay) showNIP11(w http.ResponseWriter) {
-	b, err := utils.Marshal(rl.Info)
-	if err != nil {
-		fmt.Fprintf(w, "{}")
-		return
-	}
-
-	_, _ = w.Write(b)
-	w.Header().Set("Content-Type", "application/nostr+json")
-}
-
-// showInfo show html info
-func (rl *Relay) showInfo(w http.ResponseWriter) {
-	supportedNIPs := rl.Info.SupportedNIPs
-	arrSupportedNIPs := make([]string, len(supportedNIPs))
-	for i, v := range supportedNIPs {
-		arrSupportedNIPs[i] = strconv.Itoa(v)
-	}
-
-	var str []string
-	str = append(str, fmt.Sprintf("Name: %s", rl.Info.Name))
-	str = append(str, fmt.Sprintf("Description: %s", rl.Info.Description))
-	str = append(str, fmt.Sprintf("PubKey: %s", rl.Info.PubKey))
-	str = append(str, fmt.Sprintf("Contact: %s", rl.Info.Contact))
-	str = append(str, fmt.Sprintf("SupportedNIPs: %s", strings.Join(arrSupportedNIPs, ", ")))
-	str = append(str, fmt.Sprintf("Version: %s", rl.Info.Version))
-	fmt.Fprint(w, strings.Join(str, "\n"))
 }

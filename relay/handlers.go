@@ -3,8 +3,8 @@ package relay
 import (
 	"errors"
 
-	"github.com/lesismal/nbio/nbhttp/websocket"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/saveblush/gofiber3-contrib/websocket"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
