@@ -23,6 +23,7 @@ import (
 
 const (
 	// MaximumSize body limit
+	MaximumSize3MB = 1024 * 1024 * 3
 	MaximumSize1MB = 1024 * 1024 * 1
 
 	// Timeout
@@ -77,7 +78,7 @@ func main() {
 		Info:               nip11,
 		KeepaliveTime:      Timeout60s,
 		HandshakeTimeout:   Timeout45s,
-		MessageLengthLimit: MaximumSize1MB,
+		MessageLengthLimit: MaximumSize3MB,
 	})
 
 	// Init server
@@ -86,17 +87,16 @@ func main() {
 
 	// Init app
 	engine := nbhttp.NewEngine(nbhttp.Config{
-		Name:                    config.CF.Info.Name,
-		Network:                 "tcp",
-		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		ReadLimit:               MaximumSize1MB,
-		MaxHTTPBodySize:         MaximumSize1MB,
-		WriteTimeout:            Timeout30s,
-		KeepaliveTime:           Timeout60s,
-		ReleaseWebsocketPayload: true,
-		IOMod:                   nbhttp.IOModMixed,
-		MessageHandlerPoolSize:  16,
-		Handler:                 cors.Default().Handler(mux),
+		Name:            config.CF.Info.Name,
+		Network:         "tcp",
+		Addrs:           []string{fmt.Sprintf(":%d", config.CF.App.Port)},
+		ReadLimit:       MaximumSize1MB,
+		MaxHTTPBodySize: MaximumSize1MB,
+		WriteTimeout:    Timeout30s,
+		KeepaliveTime:   Timeout60s,
+		//ReleaseWebsocketPayload: true,
+		IOMod:   nbhttp.IOModBlocking,
+		Handler: cors.Default().Handler(mux),
 	})
 
 	// Start app

@@ -181,6 +181,8 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 		_ = s.responseEose(subID)
 	}
 
+	logger.Log.Info("response req... ok")
+
 	return nil
 }
 
