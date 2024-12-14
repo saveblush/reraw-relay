@@ -51,8 +51,10 @@ func (s *service) RejectValidateTimeStamp(c *cctx.Context, evt *nostr.Event) (bo
 // RejectEventWithCharacter reject event with character
 func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (bool, string) {
 	characters := []string{
-		"data:image",
-		"data:video",
+		//"data:image",
+		//"data:video",
+		"ReplyGuy",
+		"ReplyGirl",
 	}
 
 	for _, character := range characters {
