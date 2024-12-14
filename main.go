@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -27,6 +28,7 @@ const (
 	MaximumSize1MB = 1024 * 1024 * 1
 
 	// Timeout
+	Timeout75s = time.Second * 75
 	Timeout60s = time.Second * 60
 	Timeout45s = time.Second * 45
 	Timeout30s = time.Second * 30
@@ -35,6 +37,8 @@ const (
 )
 
 func main() {
+	flag.Parse()
+
 	// Init logger
 	logger.InitLogger()
 
@@ -76,7 +80,7 @@ func main() {
 	copier.Copy(nip11, &config.CF.Info)
 	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
-		KeepaliveTime:      Timeout60s,
+		KeepaliveTime:      Timeout75s,
 		HandshakeTimeout:   Timeout45s,
 		MessageLengthLimit: MaximumSize3MB,
 	})
@@ -87,16 +91,16 @@ func main() {
 
 	// Init app
 	engine := nbhttp.NewEngine(nbhttp.Config{
-		Name:            config.CF.Info.Name,
-		Network:         "tcp",
-		Addrs:           []string{fmt.Sprintf(":%d", config.CF.App.Port)},
-		ReadLimit:       MaximumSize1MB,
-		MaxHTTPBodySize: MaximumSize1MB,
-		WriteTimeout:    Timeout30s,
-		KeepaliveTime:   Timeout60s,
-		//ReleaseWebsocketPayload: true,
-		IOMod:   nbhttp.IOModBlocking,
-		Handler: cors.Default().Handler(mux),
+		Name:                    config.CF.Info.Name,
+		Network:                 "tcp",
+		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
+		Handler:                 cors.Default().Handler(mux),
+		ReleaseWebsocketPayload: true,
+		ReadBufferSize:          1024 * 4,
+		ReadLimit:               MaximumSize1MB,
+		MaxHTTPBodySize:         MaximumSize1MB,
+		WriteTimeout:            Timeout30s,
+		IOMod:                   nbhttp.IOModBlocking,
 	})
 
 	// Start app

@@ -1,10 +1,6 @@
 package eventstore
 
 import (
-	"errors"
-
-	"gorm.io/gorm"
-
 	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 
@@ -51,7 +47,7 @@ func (s *service) FindAll(c *cctx.Context, req *Request) ([]*nostr.Event, error)
 
 func (s *service) FindByID(c *cctx.Context, ID string) (*nostr.Event, error) {
 	fetch, err := s.repository.FindByID(c.GetRelayDatabase(), ID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil {
 		return nil, err
 	}
 

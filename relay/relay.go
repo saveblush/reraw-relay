@@ -158,10 +158,9 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			_ = c.WriteMessage(websocket.PongMessage, nil)
 			return
 		}
-		//c.SetReadDeadline(time.Now().Add(time.Second * 20))
 
 		// event nostr
-		//storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
+		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
 		rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
 		rejectEvent := append(RejectEvent{},
 			rl.policies.RejectValidateEvent,
@@ -171,8 +170,8 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			rl.policies.RejectEventWithCharacter)
 
 		sess := &session{
-			Ws: c,
-			//StoreEvent:   storeEvent,
+			Ws:           c,
+			StoreEvent:   storeEvent,
 			RejectFilter: rejectFilter,
 			RejectEvent:  rejectEvent,
 		}
@@ -182,6 +181,7 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			logger.Log.Errorf("handle event error: %s", err)
 			return
 		}
+		c.SetReadDeadline(time.Now().Add(time.Second * 45))
 	})
 }
 

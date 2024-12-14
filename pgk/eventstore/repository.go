@@ -180,7 +180,7 @@ func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*nostr.Event, error) 
 
 func (r *repository) FindByID(db *gorm.DB, ID string) (*models.RelayEvent, error) {
 	entities := &models.RelayEvent{}
-	err := db.Where("id = ?", ID).First(entities).Error
+	err := db.Limit(1).Where("id = ?", ID).Find(entities).Error
 	if err != nil {
 		return nil, err
 	}
