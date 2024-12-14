@@ -157,13 +157,14 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			_ = c.Close()
 			return
 		} else if mt == websocket.PingMessage {
+			logger.Log.Warn("ping... pong...")
 			_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
 			_ = c.WriteMessage(websocket.PongMessage, nil)
 			return
 		}
 
 		// event nostr
-		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
+		//storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
 		rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
 		rejectEvent := append(RejectEvent{},
 			rl.policies.RejectValidateEvent,
@@ -173,8 +174,8 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			rl.policies.RejectEventWithCharacter)
 
 		sess := &session{
-			Ws:           c,
-			StoreEvent:   storeEvent,
+			Ws: c,
+			//StoreEvent:   storeEvent,
 			RejectFilter: rejectFilter,
 			RejectEvent:  rejectEvent,
 		}
