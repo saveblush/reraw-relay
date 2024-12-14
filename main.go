@@ -18,7 +18,6 @@ import (
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/sql"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
-	"github.com/saveblush/reraw-relay/pgk/cron"
 	"github.com/saveblush/reraw-relay/relay"
 )
 
@@ -111,8 +110,8 @@ func main() {
 	}
 
 	// Cron
-	cron := cron.NewService()
-	cron.Start()
+	//cron := cron.NewService()
+	//cron.Start()
 
 	// Shutdown app
 	exit, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -138,8 +137,8 @@ func main() {
 	logger.Log.Info("Relay closed")
 
 	// Close cron
-	go cron.Stop()
-	logger.Log.Info("Cron closed")
+	//go cron.Stop()
+	//logger.Log.Info("Cron closed")
 
 	// Close db
 	go sql.CloseConnection(sql.RelayDatabase)
