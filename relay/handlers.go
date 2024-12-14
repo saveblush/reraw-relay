@@ -57,33 +57,45 @@ func (s *service) handleEvent(msg []byte) error {
 		_ = s.responseError(errInvalidMessage.Error())
 		return errInvalidMessage
 	}
-	//logger.Log.Info("parse msg: ", envelope)
-	logger.Log.Info("parse msg... ok")
+	logger.Log.Info("parse msg: ", envelope)
+	//logger.Log.Info("parse msg... ok")
 
 	switch env := envelope.(type) {
 	case *nostr.EventEnvelope:
+		logger.Log.Info("on event... ok")
 		err := s.onEvent(&env.Event)
 		if err != nil {
+			logger.Log.Info("response event... error => ", err)
 			return err
 		}
+		logger.Log.Info("response event... ok")
 
 	case *nostr.ReqEnvelope:
+		logger.Log.Info("on req... ok")
 		err := s.onReq(env.SubscriptionID, &env.Filters)
 		if err != nil {
+			logger.Log.Info("response req... error => ", err)
 			return err
 		}
+		logger.Log.Info("response req... ok")
 
 	case *nostr.CloseEnvelope:
+		logger.Log.Info("on close... ok")
 		err := s.onClose(env)
 		if err != nil {
+			logger.Log.Info("response close... error => ", err)
 			return err
 		}
+		logger.Log.Info("response close... ok")
 
 	case *nostr.CountEnvelope:
+		logger.Log.Info("on count... ok")
 		err := s.onCount(env.SubscriptionID, &env.Filters)
 		if err != nil {
+			logger.Log.Info("response count... error => ", err)
 			return err
 		}
+		logger.Log.Info("response count... ok")
 
 	default:
 		_ = s.responseError(errUnknownCommand.Error())
@@ -106,8 +118,8 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	err := s.clearEventOlder(evt)
 	if err != nil {
 		logger.Log.Errorf("clear older error: %s", err)
-		_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
-		return errConnectDatabase
+		_ = s.responseOK(evt.ID, false, err.Error())
+		return err
 	}
 
 	// ckeck duplicate
@@ -180,8 +192,6 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 
 		_ = s.responseEose(subID)
 	}
-
-	logger.Log.Info("response req... ok")
 
 	return nil
 }
