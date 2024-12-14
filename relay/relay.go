@@ -119,7 +119,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	}
 
 	upgrader.OnOpen(func(c *websocket.Conn) {
-		logger.Log().Info("onOpen: ", c.RemoteAddr().String())
+		logger.Log.Info("onOpen: ", c.RemoteAddr().String())
 
 		_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
 
@@ -129,7 +129,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	})
 
 	upgrader.OnClose(func(c *websocket.Conn, err error) {
-		logger.Log().Info("onClose: ", c.RemoteAddr().String(), err)
+		logger.Log.Info("onClose: ", c.RemoteAddr().String(), err)
 
 		rl.clientsMutex.Lock()
 		delete(rl.clients, c)
@@ -144,13 +144,13 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 	upgrader := rl.newUpgrader()
 	up, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Log().Panicf("upgrader error: %s", err)
+		logger.Log.Panicf("upgrader error: %s", err)
 	}
 
 	// set event reject
 	up.OnMessage(func(c *websocket.Conn, mt websocket.MessageType, msg []byte) {
 		if mt != websocket.TextMessage {
-			logger.Log().Error("message is not UTF-8. disconnecting...")
+			logger.Log.Error("message is not UTF-8. disconnecting...")
 			_ = c.Close()
 			return
 		} else if mt == websocket.PingMessage {
@@ -179,7 +179,7 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 		rt := newHandleEvent(sess)
 		err := rt.handleEvent(msg)
 		if err != nil {
-			logger.Log().Errorf("handle event error: %s", err)
+			logger.Log.Errorf("handle event error: %s", err)
 			return
 		}
 	})

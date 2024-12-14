@@ -121,7 +121,7 @@ func (s *service) FindPubkeyBlacklists(c *cctx.Context, req *models.Blacklist) (
 	res := []string{}
 	fetch, err := s.repository.FindBlacklists(c.GetRelayDatabase(), req)
 	if err != nil {
-		logger.Log().Errorf("find blacklist error: %s", err)
+		logger.Log.Errorf("find blacklist error: %s", err)
 		return nil, err
 	}
 
@@ -137,7 +137,7 @@ func (s *service) ClearEventsWithBlacklist(c *cctx.Context) error {
 	// find blacklists
 	blacklists, err := s.FindPubkeyBlacklists(c, &models.Blacklist{})
 	if err != nil {
-		logger.Log().Errorf("find blacklist error: %s", err)
+		logger.Log.Errorf("find blacklist error: %s", err)
 		return err
 	}
 
@@ -148,7 +148,7 @@ func (s *service) ClearEventsWithBlacklist(c *cctx.Context) error {
 	// find event
 	fetch, err := s.FindAll(c, &Request{NostrFilter: &nostr.Filter{Authors: blacklists}, NoLimit: true})
 	if err != nil {
-		logger.Log().Errorf("find event with blacklist error: %s", err)
+		logger.Log.Errorf("find event with blacklist error: %s", err)
 		return err
 	}
 
@@ -156,7 +156,7 @@ func (s *service) ClearEventsWithBlacklist(c *cctx.Context) error {
 	for _, v := range fetch {
 		err := s.repository.SoftDelete(c.GetRelayDatabase(), &models.RelayEvent{ID: v.ID})
 		if err != nil {
-			logger.Log().Errorf("soft delete event with blacklist error: %s", err)
+			logger.Log.Errorf("soft delete event with blacklist error: %s", err)
 			return err
 		}
 	}

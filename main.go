@@ -23,28 +23,24 @@ import (
 
 const (
 	// MaximumSize body limit
-	MaximumSize10MB = 1024 * 1024 * 10
-	MaximumSize4MB  = 1024 * 1024 * 4
-	MaximumSize1MB  = 1024 * 1024 * 1
+	MaximumSize1MB = 1024 * 1024 * 1
 
 	// Timeout
 	Timeout60s = time.Second * 60
 	Timeout45s = time.Second * 45
 	Timeout30s = time.Second * 30
 	Timeout20s = time.Second * 20
-	Timeout15s = time.Second * 15
-	Timeout10s = time.Second * 10
 	Timeout5s  = time.Second * 5
 )
 
 func main() {
 	// Init logger
-	logger.New()
+	logger.InitLogger()
 
 	// Init configuration
 	err := config.InitConfig()
 	if err != nil {
-		logger.Log().Fatalf("init configuration error: %s", err)
+		logger.Log.Fatalf("init configuration error: %s", err)
 	}
 
 	// Init connection database
@@ -60,7 +56,7 @@ func main() {
 	}
 	session, err := sql.InitConnection(cfdb)
 	if err != nil {
-		logger.Log().Fatalf("init connection db error: %s", err)
+		logger.Log.Fatalf("init connection db error: %s", err)
 	}
 
 	// Set to global variable database
@@ -80,7 +76,7 @@ func main() {
 	rl := relay.NewRelay(&relay.Relay{
 		Info:               nip11,
 		KeepaliveTime:      Timeout60s,
-		HandshakeTimeout:   Timeout60s,
+		HandshakeTimeout:   Timeout45s,
 		MessageLengthLimit: MaximumSize1MB,
 	})
 
@@ -95,7 +91,7 @@ func main() {
 		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
 		ReadLimit:               MaximumSize1MB,
 		MaxHTTPBodySize:         MaximumSize1MB,
-		WriteTimeout:            Timeout20s,
+		WriteTimeout:            Timeout30s,
 		KeepaliveTime:           Timeout60s,
 		ReleaseWebsocketPayload: true,
 		IOMod:                   nbhttp.IOModMixed,
@@ -106,7 +102,7 @@ func main() {
 	// Start app
 	err = engine.Start()
 	if err != nil {
-		logger.Log().Fatalf("app start error: %s", err)
+		logger.Log.Fatalf("app start error: %s", err)
 		return
 	}
 
@@ -120,7 +116,7 @@ func main() {
 	serverShutdown := make(chan struct{})
 	go func() {
 		<-exit.Done()
-		logger.Log().Info("Gracefully shutting down...")
+		logger.Log.Info("Gracefully shutting down...")
 		ctx, cancel := context.WithTimeout(context.Background(), Timeout5s)
 		defer cancel()
 
@@ -131,19 +127,19 @@ func main() {
 
 	// Cleanup tasks
 	<-serverShutdown
-	logger.Log().Info("Running cleanup tasks...")
+	logger.Log.Info("Running cleanup tasks...")
 
 	// Close relay
 	go rl.CloseRelay()
-	logger.Log().Info("Relay closed")
+	logger.Log.Info("Relay closed")
 
 	// Close cron
 	go cron.Stop()
-	logger.Log().Info("Cron closed")
+	logger.Log.Info("Cron closed")
 
 	// Close db
 	go sql.CloseConnection(sql.RelayDatabase)
-	logger.Log().Info("Database connection closed")
+	logger.Log.Info("Database connection closed")
 
-	logger.Log().Info("App was successful shutdown")
+	logger.Log.Info("App was successful shutdown")
 }

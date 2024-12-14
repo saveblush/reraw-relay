@@ -31,12 +31,12 @@ func createDatabase(cf *Configuration) error {
 	var exc string
 	err = db.Raw(sql, cf.DatabaseName).Scan(&exc).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		logger.Log().Errorf("check already database error: %s", err)
+		logger.Log.Errorf("check already database error: %s", err)
 	}
 	if !generic.IsEmpty(exc) {
 		err := db.Exec(exc).Error
 		if err != nil {
-			logger.Log().Errorf("create database error: %s", err)
+			logger.Log.Errorf("create database error: %s", err)
 			return err
 		}
 	}
@@ -100,7 +100,7 @@ func Migration(db *gorm.DB) error {
 	for _, sql := range sqls {
 		err := db.Exec(sql).Error
 		if err != nil {
-			logger.Log().Errorf("db migration error: %s", err)
+			logger.Log.Errorf("db migration error: %s", err)
 			return err
 		}
 	}
