@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"os"
 
 	"go.uber.org/zap"
@@ -49,7 +50,7 @@ func InitLogger() {
 	// high-priority logs.
 
 	// First, define our level-handling logic.
-	/*highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+	highPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		return lvl >= zapcore.ErrorLevel
 	})
 	lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
@@ -88,10 +89,10 @@ func InitLogger() {
 	defer logger.Sync()
 
 	zap.ReplaceGlobals(logger)
-	Log = zap.S()*/
+	Log = zap.S()
 
 	///////////////// 2
-	lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+	/*lowPriority := zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 		return lvl < zapcore.ErrorLevel
 	})
 	encoderConfig := zap.NewProductionEncoderConfig()
@@ -102,5 +103,5 @@ func InitLogger() {
 	)
 	logger := zap.New(core, zap.AddCaller())
 	zap.ReplaceGlobals(logger)
-	Log = zap.S()
+	Log = zap.S()*/
 }
