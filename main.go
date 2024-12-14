@@ -96,11 +96,11 @@ func main() {
 		Addrs:                   []string{fmt.Sprintf(":%d", config.CF.App.Port)},
 		Handler:                 cors.Default().Handler(mux),
 		ReleaseWebsocketPayload: true,
-		ReadBufferSize:          1024 * 4,
-		ReadLimit:               MaximumSize1MB,
-		MaxHTTPBodySize:         MaximumSize1MB,
-		WriteTimeout:            Timeout30s,
-		IOMod:                   nbhttp.IOModBlocking,
+		//ReadBufferSize:          1024 * 4,
+		//ReadLimit:               MaximumSize1MB,
+		//MaxHTTPBodySize:         MaximumSize1MB,
+		//WriteTimeout:            Timeout30s,
+		IOMod: nbhttp.IOModBlocking,
 	})
 
 	// Start app

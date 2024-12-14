@@ -106,7 +106,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	//upgrader.BlockingModAsyncWrite = true
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	if rl.HandshakeTimeout > 0 {
+	/*if rl.HandshakeTimeout > 0 {
 		upgrader.HandshakeTimeout = rl.HandshakeTimeout
 	}
 
@@ -116,7 +116,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 
 	if rl.MessageLengthLimit > 0 {
 		upgrader.MessageLengthLimit = rl.MessageLengthLimit
-	}
+	}*/
 
 	upgrader.OnOpen(func(c *websocket.Conn) {
 		logger.Log.Info("onOpen: ", c.RemoteAddr().String())
