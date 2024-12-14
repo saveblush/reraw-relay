@@ -32,7 +32,7 @@ func NewService() Service {
 }
 
 func (s *service) Start() {
-	logger.Log().Info("cron init...")
+	logger.Log.Info("cron init...")
 	s.schedule()
 	s.cron.Start()
 }

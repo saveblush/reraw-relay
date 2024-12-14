@@ -12,17 +12,17 @@ import (
 func (s *service) response(v interface{}) error {
 	b, err := utils.Marshal(v)
 	if err != nil {
-		logger.Log().Errorf("response marshal error: %s", err)
+		logger.Log.Errorf("response marshal error: %s", err)
 		return err
 	}
 
 	err = s.session.Ws.WriteMessage(websocket.TextMessage, b)
 	if err != nil {
-		logger.Log().Errorf("write msg error: %s", err)
+		logger.Log.Errorf("write msg error: %s", err)
 		return err
 	}
-	//logger.Log().Info("response msg: ", v)
-	//logger.Log().Info("response msg... ok")
+	//logger.Log.Info("response msg: ", v)
+	//logger.Log.Info("response msg... ok")
 
 	return nil
 }

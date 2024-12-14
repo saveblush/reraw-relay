@@ -124,25 +124,25 @@ func InitConfig() error {
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if err := v.ReadInConfig(); err != nil {
-		logger.Log().Errorf("read config file error: %s", err)
+		logger.Log.Errorf("read config file error: %s", err)
 		return err
 	}
 
 	if err := v.Unmarshal(CF); err != nil {
-		logger.Log().Errorf("binding config error: %s", err)
+		logger.Log.Errorf("binding config error: %s", err)
 		return err
 	}
 
 	// set config ปิด/เปิด ระบบ
 	if err := initConfigAvailable(); err != nil {
-		logger.Log().Errorf("init config available error: %s", err)
+		logger.Log.Errorf("init config available error: %s", err)
 		return err
 	}
 
 	v.OnConfigChange(func(e fsnotify.Event) {
-		logger.Log().Infof("config file changed: %s", e.Name)
+		logger.Log.Infof("config file changed: %s", e.Name)
 		if err := v.Unmarshal(CF); err != nil {
-			logger.Log().Errorf("binding config error: %s", err)
+			logger.Log.Errorf("binding config error: %s", err)
 		}
 	})
 	v.WatchConfig()
@@ -155,12 +155,12 @@ func InitConfig() error {
 func initConfigAvailable() error {
 	// create file config
 	if err := CF.SetConfigAvailableStatus(AvailableStatusOnline); err != nil {
-		logger.Log().Errorf("creating file available status error: %s", err)
+		logger.Log.Errorf("creating file available status error: %s", err)
 		return err
 	}
 
 	if err := CF.SetConfigAvailableDescription(""); err != nil {
-		logger.Log().Errorf("creating file available description error: %s", err)
+		logger.Log.Errorf("creating file available description error: %s", err)
 		return err
 	}
 
@@ -172,21 +172,21 @@ func initConfigAvailable() error {
 	v.AutomaticEnv()
 
 	if err := v.ReadInConfig(); err != nil {
-		logger.Log().Errorf("read config file error: %s", err)
+		logger.Log.Errorf("read config file error: %s", err)
 		return err
 	}
 
 	cf := &AvailableConfig{}
 	if err := v.Unmarshal(cf); err != nil {
-		logger.Log().Errorf("binding config error: %s", err)
+		logger.Log.Errorf("binding config error: %s", err)
 		return err
 	}
 	CF.App.AvailableStatus = cf.Status
 
 	v.OnConfigChange(func(e fsnotify.Event) {
-		logger.Log().Infof("config file changed: %s", e.Name)
+		logger.Log.Infof("config file changed: %s", e.Name)
 		if err := v.Unmarshal(cf); err != nil {
-			logger.Log().Errorf("binding config error: %s", err)
+			logger.Log.Errorf("binding config error: %s", err)
 		}
 		CF.App.AvailableStatus = cf.Status
 	})

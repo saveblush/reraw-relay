@@ -101,9 +101,9 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 // newUpgrader new upgrader
 func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	upgrader := websocket.NewUpgrader()
-	upgrader.EnableCompression(true)
-	upgrader.SetCompressionLevel(2)
-	upgrader.BlockingModAsyncWrite = true
+	//upgrader.EnableCompression(true)
+	//upgrader.SetCompressionLevel(2)
+	//upgrader.BlockingModAsyncWrite = true
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
 	if rl.HandshakeTimeout > 0 {
@@ -119,21 +119,21 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	}
 
 	upgrader.OnOpen(func(c *websocket.Conn) {
-		logger.Log().Info("onOpen: ", c.RemoteAddr().String())
+		logger.Log.Info("onOpen: ", c.RemoteAddr().String())
 
-		_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
+		/*_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
 
 		rl.clientsMutex.Lock()
 		rl.clients[c] = make([]string, 0, 2)
-		rl.clientsMutex.Unlock()
+		rl.clientsMutex.Unlock()*/
 	})
 
 	upgrader.OnClose(func(c *websocket.Conn, err error) {
-		logger.Log().Info("onClose: ", c.RemoteAddr().String(), err)
+		logger.Log.Info("onClose: ", c.RemoteAddr().String(), err)
 
-		rl.clientsMutex.Lock()
+		/*rl.clientsMutex.Lock()
 		delete(rl.clients, c)
-		rl.clientsMutex.Unlock()
+		rl.clientsMutex.Unlock()*/
 	})
 
 	return upgrader
@@ -144,13 +144,13 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 	upgrader := rl.newUpgrader()
 	up, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Log().Panicf("upgrader error: %s", err)
+		logger.Log.Panicf("upgrader error: %s", err)
 	}
 
 	// set event reject
 	up.OnMessage(func(c *websocket.Conn, mt websocket.MessageType, msg []byte) {
 		if mt != websocket.TextMessage {
-			logger.Log().Error("message is not UTF-8. disconnecting...")
+			logger.Log.Error("message is not UTF-8. disconnecting...")
 			_ = c.Close()
 			return
 		} else if mt == websocket.PingMessage {
@@ -158,10 +158,10 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			_ = c.WriteMessage(websocket.PongMessage, nil)
 			return
 		}
-		c.SetReadDeadline(time.Now().Add(time.Second * 20))
+		//c.SetReadDeadline(time.Now().Add(time.Second * 20))
 
 		// event nostr
-		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
+		//storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
 		rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
 		rejectEvent := append(RejectEvent{},
 			rl.policies.RejectValidateEvent,
@@ -171,15 +171,15 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 			rl.policies.RejectEventWithCharacter)
 
 		sess := &session{
-			Ws:           c,
-			StoreEvent:   storeEvent,
+			Ws: c,
+			//StoreEvent:   storeEvent,
 			RejectFilter: rejectFilter,
 			RejectEvent:  rejectEvent,
 		}
 		rt := newHandleEvent(sess)
 		err := rt.handleEvent(msg)
 		if err != nil {
-			logger.Log().Errorf("handle event error: %s", err)
+			logger.Log.Errorf("handle event error: %s", err)
 			return
 		}
 	})

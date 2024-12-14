@@ -57,8 +57,8 @@ func (s *service) handleEvent(msg []byte) error {
 		_ = s.responseError(errInvalidMessage.Error())
 		return errInvalidMessage
 	}
-	//logger.Log().Info("parse msg: ", envelope)
-	logger.Log().Info("parse msg... ok")
+	//logger.Log.Info("parse msg: ", envelope)
+	logger.Log.Info("parse msg... ok")
 
 	switch env := envelope.(type) {
 	case *nostr.EventEnvelope:
@@ -105,7 +105,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	// clear older
 	err := s.clearEventOlder(evt)
 	if err != nil {
-		logger.Log().Errorf("clear older error: %s", err)
+		logger.Log.Errorf("clear older error: %s", err)
 		_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
 		return errConnectDatabase
 	}
@@ -113,7 +113,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	// ckeck duplicate
 	fetch, err := s.eventstore.FindByID(s.cctx, evt.ID)
 	if err != nil {
-		logger.Log().Errorf("find duplicate error: %s", err)
+		logger.Log.Errorf("find duplicate error: %s", err)
 		_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
 		return errConnectDatabase
 	}
@@ -126,7 +126,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	for _, storeFunc := range s.session.StoreEvent {
 		err := storeFunc(s.cctx, evt)
 		if err != nil {
-			logger.Log().Errorf("func store event error: %s", err)
+			logger.Log.Errorf("func store event error: %s", err)
 			_ = s.responseOK(evt.ID, false, nostr.NormalizeOKMessage(err.Error(), "error"))
 			return err
 		}
@@ -134,7 +134,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 
 	err = s.storeEvent(evt)
 	if err != nil {
-		logger.Log().Errorf("store event error: %s", err)
+		logger.Log.Errorf("store event error: %s", err)
 		_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
 		return errConnectDatabase
 	}
@@ -145,7 +145,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 		// soft delete
 		err = s.nip09.CancelEvent(s.cctx, evt)
 		if err != nil {
-			logger.Log().Errorf("soft delete error: %s", err)
+			logger.Log.Errorf("soft delete error: %s", err)
 			_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
 			return errConnectDatabase
 		}
@@ -169,7 +169,7 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 		// find event
 		fetch, err := s.eventstore.FindAll(s.cctx, &eventstore.Request{NostrFilter: &filter})
 		if err != nil {
-			logger.Log().Errorf("find filter [index: %d] error: %s", idx, err)
+			logger.Log.Errorf("find filter [index: %d] error: %s", idx, err)
 			_ = s.responseClosed(subID, errConnectDatabase.Error())
 			return err
 		}
@@ -180,6 +180,8 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 
 		_ = s.responseEose(subID)
 	}
+
+	logger.Log.Info("response req... ok")
 
 	return nil
 }
@@ -203,7 +205,7 @@ func (s *service) onCount(subID string, filters *nostr.Filters) error {
 	for idx, filter := range *filters {
 		count, err := s.nip45.CountEvent(s.cctx, &filter)
 		if err != nil {
-			logger.Log().Errorf("count filter [index: %d] error: %s", idx, err)
+			logger.Log.Errorf("count filter [index: %d] error: %s", idx, err)
 			_ = s.responseClosed(subID, errConnectDatabase.Error())
 			return err
 		}
@@ -241,7 +243,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 		filterEvent = &nostr.Filter{Authors: []string{evt.PubKey}, Kinds: []int{evt.Kind}, Tags: nostr.TagMap{"d": []string{d.Value()}}}
 		isDeleteOlder = true
 	}
-	logger.Log().Info("is delete older: ", isDeleteOlder)
+	logger.Log.Info("is delete older: ", isDeleteOlder)
 
 	// ลบข้อมูลเดิมก่อนยิงใหม่
 	if isDeleteOlder && generic.IsEmpty(filterEvent) {
@@ -251,7 +253,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 	if isDeleteOlder {
 		fetch, err := s.eventstore.FindAll(s.cctx, &eventstore.Request{NostrFilter: filterEvent})
 		if err != nil {
-			logger.Log().Errorf("find error: %s", err)
+			logger.Log.Errorf("find error: %s", err)
 			return err
 		}
 
@@ -260,7 +262,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 			if s.isOlder(previous, evt) {
 				err := s.eventstore.Delete(s.cctx, &models.RelayEvent{ID: previous.ID})
 				if err != nil {
-					logger.Log().Errorf("delete older error: %s", err)
+					logger.Log.Errorf("delete older error: %s", err)
 					return err
 				}
 			}
@@ -299,7 +301,7 @@ func (s *service) storeEvent(evt *nostr.Event) error {
 	}
 	err = s.eventstore.Insert(s.cctx, v)
 	if err != nil {
-		logger.Log().Errorf("insert error: %s", err)
+		logger.Log.Errorf("insert error: %s", err)
 		return err
 	}
 

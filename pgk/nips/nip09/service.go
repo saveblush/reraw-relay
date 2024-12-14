@@ -60,7 +60,7 @@ func (s *service) CancelEvent(c *cctx.Context, evt *nostr.Event) error {
 	// LimitZero = true เพื่อไม่ต้อง limit
 	fetch, err := s.eventstore.FindAll(c, &eventstore.Request{NostrFilter: &nostr.Filter{IDs: ids, Kinds: kinds, Authors: []string{evt.PubKey}}, NoLimit: true})
 	if err != nil {
-		logger.Log().Errorf("find cancel error: %s", err)
+		logger.Log.Errorf("find cancel error: %s", err)
 		return err
 	}
 
@@ -68,7 +68,7 @@ func (s *service) CancelEvent(c *cctx.Context, evt *nostr.Event) error {
 	for _, v := range fetch {
 		err := s.eventstore.SoftDelete(c, &models.RelayEvent{ID: v.ID})
 		if err != nil {
-			logger.Log().Errorf("soft delete error: %s", err)
+			logger.Log.Errorf("soft delete error: %s", err)
 			return err
 		}
 	}

@@ -31,7 +31,7 @@ func (s *service) RejectValidateEvent(c *cctx.Context, evt *nostr.Event) (bool, 
 // RejectValidatePow reject validate pow
 func (s *service) RejectValidatePow(c *cctx.Context, evt *nostr.Event) (bool, string) {
 	pow, err := s.nip13.VerifyPow(c, evt)
-	logger.Log().Info("verify pow: ", pow)
+	logger.Log.Info("verify pow: ", pow)
 	if !pow && err != nil {
 		return true, nostr.NormalizeOKMessage(err.Error(), "pow")
 	}
@@ -68,11 +68,11 @@ func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (b
 func (s *service) RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *nostr.Event) (bool, string) {
 	bots, err := s.eventstore.FindBlacklists(c, &models.Blacklist{Pubkey: evt.PubKey})
 	if err != nil {
-		logger.Log().Warnf("reject find bot error: %s", err)
+		logger.Log.Warnf("reject find bot error: %s", err)
 	}
 
 	if !generic.IsEmpty(bots) {
-		logger.Log().Warnf("found bot: %s", evt.PubKey)
+		logger.Log.Warnf("found bot: %s", evt.PubKey)
 		return true, nostr.NormalizeOKMessage("hmm.", "blocked")
 	}
 
@@ -90,7 +90,7 @@ func (s *service) StoreBlacklistWithContent(c *cctx.Context, evt *nostr.Event) e
 		if strings.Contains(evt.Content, character) {
 			err := s.eventstore.InsertBlacklist(c, &models.Blacklist{Pubkey: evt.PubKey})
 			if err != nil {
-				logger.Log().Errorf("keep bot error: %s", err)
+				logger.Log.Errorf("keep bot error: %s", err)
 				return err
 			}
 		}
