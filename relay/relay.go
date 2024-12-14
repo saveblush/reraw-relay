@@ -101,12 +101,13 @@ func (rl *Relay) HandleWebsocket(w http.ResponseWriter, r *http.Request) {
 // newUpgrader new upgrader
 func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	upgrader := websocket.NewUpgrader()
-	//upgrader.EnableCompression(true)
-	//upgrader.SetCompressionLevel(2)
-	//upgrader.BlockingModAsyncWrite = true
+	upgrader.EnableCompression(true)
+	upgrader.SetCompressionLevel(8)
+	upgrader.BlockingModAsyncWrite = true
+	upgrader.BlockingModHandleRead = false
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	/*if rl.HandshakeTimeout > 0 {
+	if rl.HandshakeTimeout > 0 {
 		upgrader.HandshakeTimeout = rl.HandshakeTimeout
 	}
 
@@ -116,7 +117,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 
 	if rl.MessageLengthLimit > 0 {
 		upgrader.MessageLengthLimit = rl.MessageLengthLimit
-	}*/
+	}
 
 	upgrader.OnOpen(func(c *websocket.Conn) {
 		logger.Log.Info("onOpen: ", c.RemoteAddr().String())
@@ -149,6 +150,8 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 
 	// set event reject
 	up.OnMessage(func(c *websocket.Conn, mt websocket.MessageType, msg []byte) {
+		c.HandleRead(1024 * 16)
+
 		if mt != websocket.TextMessage {
 			logger.Log.Error("message is not UTF-8. disconnecting...")
 			_ = c.Close()
