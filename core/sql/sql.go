@@ -14,17 +14,16 @@ var (
 )
 
 var (
-	defaultMaxIdleConns = 10
-	defaultMaxOpenConns = 15
-	defaultMaxLifetime  = time.Hour
+	defaultMaxIdleConns = 20
+	defaultMaxOpenConns = 30
+	defaultMaxLifetime  = time.Minute
 )
 
 // gorm config
 var defaultConfig = &gorm.Config{
 	PrepareStmt:          true,
 	DisableAutomaticPing: true,
-	//QueryFields:          true,
-	Logger: logger.Default.LogMode(logger.Error),
+	Logger:               logger.Default.LogMode(logger.Error),
 }
 
 // Session session

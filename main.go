@@ -18,12 +18,12 @@ import (
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/sql"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
+	"github.com/saveblush/reraw-relay/pgk/cron"
 	"github.com/saveblush/reraw-relay/relay"
 )
 
 const (
 	// MaximumSize body limit
-	MaximumSize3MB = 1024 * 1024 * 3
 	MaximumSize1MB = 1024 * 1024 * 1
 
 	// Timeout
@@ -31,7 +31,6 @@ const (
 	Timeout60s = time.Second * 60
 	Timeout45s = time.Second * 45
 	Timeout30s = time.Second * 30
-	Timeout20s = time.Second * 20
 	Timeout5s  = time.Second * 5
 )
 
@@ -81,7 +80,7 @@ func main() {
 		Info:               nip11,
 		KeepaliveTime:      Timeout75s,
 		HandshakeTimeout:   Timeout45s,
-		MessageLengthLimit: MaximumSize3MB,
+		MessageLengthLimit: MaximumSize1MB,
 	})
 
 	// Init server
@@ -110,8 +109,8 @@ func main() {
 	}
 
 	// Cron
-	//cron := cron.NewService()
-	//cron.Start()
+	cron := cron.NewService()
+	cron.Start()
 
 	// Shutdown app
 	exit, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -137,8 +136,8 @@ func main() {
 	logger.Log.Info("Relay closed")
 
 	// Close cron
-	//go cron.Stop()
-	//logger.Log.Info("Cron closed")
+	go cron.Stop()
+	logger.Log.Info("Cron closed")
 
 	// Close db
 	go sql.CloseConnection(sql.RelayDatabase)
