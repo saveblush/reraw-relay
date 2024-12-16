@@ -85,7 +85,7 @@ func InitLogger() {
 	)
 
 	// From a zapcore.Core, it's easy to construct a Logger.
-	logger := zap.New(core)
+	logger := zap.New(core, zap.AddCaller())
 	defer logger.Sync()
 
 	zap.ReplaceGlobals(logger)
