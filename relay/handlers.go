@@ -2,6 +2,7 @@ package relay
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/lesismal/nbio/nbhttp/websocket"
 	"github.com/nbd-wtf/go-nostr"
@@ -19,7 +20,9 @@ import (
 )
 
 type session struct {
-	Ws           *websocket.Conn
+	Ws *websocket.Conn
+	mu sync.Mutex
+
 	StoreEvent   StoreEvent
 	RejectFilter RejectFilter
 	RejectEvent  RejectEvent
@@ -107,12 +110,14 @@ func (s *service) handleEvent(msg []byte) error {
 
 func (s *service) onEvent(evt *nostr.Event) error {
 	// check reject
+	s.session.mu.Lock()
 	for _, rejectFunc := range s.session.RejectEvent {
 		if reject, msg := rejectFunc(s.cctx, evt); reject {
 			_ = s.responseOK(evt.ID, false, msg)
 			return errors.New(msg)
 		}
 	}
+	s.session.mu.Unlock()
 
 	// clear older
 	err := s.clearEventOlder(evt)
@@ -135,6 +140,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	}
 
 	// store event
+	s.session.mu.Lock()
 	for _, storeFunc := range s.session.StoreEvent {
 		err := storeFunc(s.cctx, evt)
 		if err != nil {
@@ -143,6 +149,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 			return err
 		}
 	}
+	s.session.mu.Unlock()
 
 	err = s.storeEvent(evt)
 	if err != nil {
@@ -171,12 +178,14 @@ func (s *service) onEvent(evt *nostr.Event) error {
 func (s *service) onReq(subID string, filters *nostr.Filters) error {
 	for idx, filter := range *filters {
 		// check reject
+		s.session.mu.Lock()
 		for _, rejectFunc := range s.session.RejectFilter {
 			if reject, msg := rejectFunc(&filter); reject {
 				_ = s.responseClosed(subID, msg)
 				return errors.New(msg)
 			}
 		}
+		s.session.mu.Unlock()
 
 		// find event
 		fetch, err := s.eventstore.FindAll(s.cctx, &eventstore.Request{NostrFilter: &filter})
@@ -268,6 +277,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 		}
 
 		// ลบ event ที่เก่ากว่า
+		s.session.mu.Lock()
 		for _, previous := range fetch {
 			if s.isOlder(previous, evt) {
 				err := s.eventstore.Delete(s.cctx, &models.RelayEvent{ID: previous.ID})
@@ -277,6 +287,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 				}
 			}
 		}
+		s.session.mu.Unlock()
 	}
 
 	return nil
