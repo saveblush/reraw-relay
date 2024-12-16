@@ -162,18 +162,18 @@ func (rl *Relay) handleMessage(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// event nostr
-		//storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)	**ปืดไปก่อน มีปัญหาทำให้ระบบหยุดรัน
+		storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
 		rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
 		rejectEvent := append(RejectEvent{},
 			rl.policies.RejectValidateEvent,
 			rl.policies.RejectValidatePow,
 			rl.policies.RejectValidateTimeStamp,
-			//rl.policies.RejectEventFromPubkeyWithBlacklist, **ปืดไปก่อน มีปัญหาทำให้ระบบหยุดรัน
-			rl.policies.RejectEventWithCharacter)
+			rl.policies.RejectEventWithCharacter,
+			rl.policies.RejectEventFromPubkeyWithBlacklist)
 
 		sess := &session{
-			Ws: c,
-			//StoreEvent:   storeEvent,
+			Ws:           c,
+			StoreEvent:   storeEvent,
 			RejectFilter: rejectFilter,
 			RejectEvent:  rejectEvent,
 		}
