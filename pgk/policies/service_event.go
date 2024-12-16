@@ -53,8 +53,8 @@ func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (b
 	characters := []string{
 		//"data:image",
 		//"data:video",
-		"ReplyGuy",
-		"ReplyGirl",
+		//"ReplyGuy",
+		//"ReplyGirl",
 	}
 
 	for _, character := range characters {
