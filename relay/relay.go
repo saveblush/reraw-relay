@@ -118,7 +118,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	}
 
 	upgrader.OnOpen(func(c *websocket.Conn) {
-		logger.Log.Info("onOpen: ", c.RemoteAddr().String())
+		logger.Log.Info("[onopen] ", c.RemoteAddr().String())
 
 		_ = c.SetDeadline(time.Now().Add(pingInterval + pingWait))
 
@@ -128,7 +128,7 @@ func (rl *Relay) newUpgrader() *websocket.Upgrader {
 	})
 
 	upgrader.OnClose(func(c *websocket.Conn, err error) {
-		logger.Log.Info("onClose: ", c.RemoteAddr().String(), err)
+		logger.Log.Info("[onclose] ", c.RemoteAddr().String(), err)
 
 		rl.clientsMutex.Lock()
 		delete(rl.clients, c)

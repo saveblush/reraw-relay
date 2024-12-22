@@ -3,6 +3,7 @@ package relay
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/lesismal/nbio/nbhttp/websocket"
 	"github.com/nbd-wtf/go-nostr"
@@ -10,6 +11,7 @@ import (
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
+	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/eventstore"
@@ -61,44 +63,41 @@ func (s *service) handleEvent(msg []byte) error {
 		return errInvalidMessage
 	}
 	//logger.Log.Info("parse msg: ", envelope)
-	logger.Log.Info("parse msg... ok")
+
+	start := utils.Now()
 
 	switch env := envelope.(type) {
 	case *nostr.EventEnvelope:
-		logger.Log.Info("on event... ok")
 		err := s.onEvent(&env.Event)
 		if err != nil {
-			logger.Log.Info("response event... error => ", err)
+			logger.Log.Info("[event] error: ", err)
 			return err
 		}
-		logger.Log.Info("response event... ok")
+		logger.Log.Info("[event] processed in ", time.Since(start))
 
 	case *nostr.ReqEnvelope:
-		logger.Log.Info("on req... ok")
 		err := s.onReq(env.SubscriptionID, &env.Filters)
 		if err != nil {
-			logger.Log.Info("response req... error => ", err)
+			logger.Log.Info("[req] error: ", err)
 			return err
 		}
-		logger.Log.Info("response req... ok")
+		logger.Log.Info("[req] processed in ", time.Since(start))
 
 	case *nostr.CloseEnvelope:
-		logger.Log.Info("on close... ok")
 		err := s.onClose(env)
 		if err != nil {
-			logger.Log.Info("response close... error => ", err)
+			logger.Log.Info("[close] error: ", err)
 			return err
 		}
-		logger.Log.Info("response close... ok")
+		logger.Log.Info("[close] processed in ", time.Since(start))
 
 	case *nostr.CountEnvelope:
-		logger.Log.Info("on count... ok")
 		err := s.onCount(env.SubscriptionID, &env.Filters)
 		if err != nil {
-			logger.Log.Info("response count... error => ", err)
+			logger.Log.Info("[close] error: ", err)
 			return err
 		}
-		logger.Log.Info("response count... ok")
+		logger.Log.Info("[close] processed in ", time.Since(start))
 
 	default:
 		_ = s.responseError(errUnknownCommand.Error())
@@ -262,7 +261,6 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 		filterEvent = &nostr.Filter{Authors: []string{evt.PubKey}, Kinds: []int{evt.Kind}, Tags: nostr.TagMap{"d": []string{d.Value()}}}
 		isDeleteOlder = true
 	}
-	logger.Log.Info("is delete older: ", isDeleteOlder)
 
 	// ลบข้อมูลเดิมก่อนยิงใหม่
 	if isDeleteOlder && generic.IsEmpty(filterEvent) {
