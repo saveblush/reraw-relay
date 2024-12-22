@@ -31,7 +31,6 @@ func (s *service) RejectValidateEvent(c *cctx.Context, evt *nostr.Event) (bool, 
 // RejectValidatePow reject validate pow
 func (s *service) RejectValidatePow(c *cctx.Context, evt *nostr.Event) (bool, string) {
 	pow, err := s.nip13.VerifyPow(c, evt)
-	logger.Log.Info("verify pow: ", pow)
 	if !pow && err != nil {
 		return true, nostr.NormalizeOKMessage(err.Error(), "pow")
 	}
