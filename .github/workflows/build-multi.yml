@@ -2,7 +2,7 @@ name: Multiplatform build & push
 
 on:
   push:
-    branches: [ "main-x" ]
+    branches: [ "main" ]
   pull_request:
   
 jobs:
