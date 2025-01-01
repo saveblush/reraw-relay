@@ -66,7 +66,7 @@ USER gouser
 
 ## Copy app
 #COPY --from=builder /app/main .
-COPY --from=builder /app/main .
+COPY --from=builder /app/main /bin/
 COPY --from=builder --chown=gouser:gouser /app/configs ./configs
 
 ENV TZ=Asia/Bangkok
