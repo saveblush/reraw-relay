@@ -8,9 +8,8 @@ ARG TAG
 
 RUN echo "Running on $BUILDPLATFORM, building for $TARGETPLATFORM, release tag $TAG"
 
-ENV CGO_ENABLED=1
+ENV CGO_ENABLED=0
 ENV GOOS=linux
-#ENV GOARCH=$GOARCH
 
 
 # Build source code
@@ -27,28 +26,26 @@ RUN adduser \
   gouser
 
 ## Change ownership
-RUN mkdir /app
-RUN chown gouser:gouser /app
+RUN mkdir /build
+RUN chown gouser:gouser /build
 
 ## Set working directory
-WORKDIR /app
+WORKDIR /build
 
 ## Copy dependency
-COPY go.mod .
-COPY go.sum .
-RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download
-#RUN go mod download
-#RUN go mod verify
+COPY go.mod go.sum ./
+
+## Get all dependencies
+RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download && go mod verify
 
 ## Copy the source code
 COPY . .
 
 ## Build app
 RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
-   -ldflags="-X 'github.com/saveblush/reraw-relay/version.Tag=$TAG'" \
-   #-ldflags="-w -s" \
-   -o main main.go
-#RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o main .
+   #-ldflags="-X 'github.com/saveblush/reraw-relay/version.Tag=$TAG'" \
+   -ldflags="-w -s" \
+   -o main .
 
 
 # Production
@@ -61,16 +58,14 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 
-USER gouser
-
 ## Copy app
-#COPY --from=builder /app/main .
-COPY --from=builder /app/main /bin/
-COPY --from=builder --chown=gouser:gouser /app/configs ./configs
+COPY --from=builder /build/main .
+COPY --from=builder --chown=gouser:gouser /build/configs ./configs
+
+USER gouser
 
 ENV TZ=Asia/Bangkok
 
 EXPOSE 8070
 
-#CMD ["./main"]
-ENTRYPOINT ["/bin/main"]
+CMD ["/app/main"]
