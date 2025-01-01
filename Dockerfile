@@ -65,6 +65,7 @@ COPY --from=builder /etc/group /etc/group
 USER gouser
 
 ## Copy app
+#COPY --from=builder /app/main .
 COPY --from=builder /app/main .
 COPY --from=builder --chown=gouser:gouser /app/configs ./configs
 
@@ -72,4 +73,5 @@ ENV TZ=Asia/Bangkok
 
 EXPOSE 8070
 
-CMD ["./main"]
+#CMD ["./main"]
+ENTRYPOINT ["/bin/main"]
