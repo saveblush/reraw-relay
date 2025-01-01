@@ -34,9 +34,8 @@ RUN chown gouser:gouser /app
 WORKDIR /app
 
 ## Copy dependency
-COPY go.mod go.sum ./
-
-## Get all dependencies
+COPY go.mod .
+COPY go.sum .
 RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download
 #RUN go mod download
 #RUN go mod verify
@@ -46,9 +45,9 @@ COPY . .
 
 ## Build app
 RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
-   #-ldflags="-X 'github.com/saveblush/reraw-relay/version.Tag=$TAG'" \
-   -ldflags="-w -s" \
-   -o main .
+   -ldflags="-X 'github.com/saveblush/reraw-relay/version.Tag=$TAG'" \
+   #-ldflags="-w -s" \
+   -o main main.go
 #RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o main .
 
 
