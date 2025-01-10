@@ -1,0 +1,69 @@
+# Define version
+ARG GO_VERSION=1.23.1
+FROM golang:${GO_VERSION}-bullseye AS base
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+ARG TAG
+
+RUN echo "Running on $BUILDPLATFORM, building for $TARGETPLATFORM, release tag $TAG"
+
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+
+
+# Build source code
+FROM base AS builder
+
+## Create user
+RUN adduser \
+  --disabled-password \
+  --gecos "" \
+  --home "/nonexistent" \
+  --shell "/sbin/nologin" \
+  --no-create-home \
+  --uid 65532 \
+  gouser
+
+## Change ownership
+RUN mkdir /build
+RUN chown gouser:gouser /build
+
+## Move to working directory /build
+WORKDIR /build
+
+## Copy and download dependency using go mod
+COPY go.mod go.sum ./
+RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download && go mod verify
+
+## Copy the source code into the container
+COPY . .
+
+## Build app
+RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
+   #-ldflags="-X 'github.com/saveblush/reraw-relay/version.Tag=$TAG'" \
+   -ldflags="-w -s" \
+   -o main .
+
+
+# Production, final image to reduce size
+FROM scratch AS runner
+WORKDIR /app
+
+## Copy os bundle from the builder
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+
+## Copy app from the builder
+COPY --from=builder /build/main .
+COPY --from=builder --chown=gouser:gouser /build/configs ./configs
+
+USER gouser
+
+ENV TZ=Asia/Bangkok
+
+EXPOSE 8070
+
+CMD ["/app/main"]

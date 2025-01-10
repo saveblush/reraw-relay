@@ -1,0 +1,27 @@
+INFO:
+  NAME: "reraw"
+  DESCRIPTION: "reraw thi mai chai lela"
+  PUBKEY: npub1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  CONTACT: ""
+  SUPPORTED_NIPS: [1, 2, 9, 11, 13, 33, 40, 45]
+  SOFTWARE: "reraw"
+  VERSION: "0.2.0"
+  ICON: "https://imgur.com/lf30xxW"
+  LIMITATION:
+    MAX_LIMIT: 50
+    MIN_POW_DIFFICULTY: 0
+
+APP:
+  PORT: 8070
+  ENVIRONMENT: "prod" #develop, prod
+
+DATABASE:
+  RELAY_SQL:
+    HOST: "localhost"
+    PORT: 5432
+    USERNAME: "user"
+    PASSWORD: "password"
+    DATABASE_NAME: "postgres"
+    MAX_IDLE_CONNS: 5
+    MAX_OPEN_CONNS: 8
+    MAX_LIFE_TIME: 5m
