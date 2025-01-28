@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 
-	"github.com/bytedance/sonic"
 	"github.com/coder/websocket"
+	"github.com/goccy/go-json"
 	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
@@ -112,10 +111,6 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
-	// pool conn
-	conn := acquireConn()
-	conn.ip = rl.ip(r)
-
 	// ws
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
@@ -124,7 +119,11 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		logger.Log.Error("ws accept error: %s", err)
 		return
 	}
-	conn.Conn = ws
+
+	conn := &Conn{
+		Conn: ws,
+		ip:   rl.ip(r),
+	}
 
 	// config ws
 	if rl.MessageLengthLimit <= 0 {
@@ -133,7 +132,6 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadLimit(rl.MessageLengthLimit)
 
 	defer func() {
-		releaseConn(conn)
 		ws.CloseNow()
 	}()
 
@@ -154,7 +152,7 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 				int(websocket.StatusNoStatusRcvd),
 				int(websocket.StatusGoingAway),
 			) {
-				logger.Log.Errorf("unexpected close error from %s: %s", conn.IP(), err)
+				logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
 			}
 			break
 		}
@@ -200,7 +198,7 @@ func (rl *Relay) isUnexpectedCloseError(err error, expectedCodes ...int) bool {
 
 // showNIP11 show nip11 info
 func (rl *Relay) showNIP11(w http.ResponseWriter) {
-	b, err := sonic.Marshal(&rl.Info)
+	b, err := json.Marshal(&rl.Info)
 	if err != nil {
 		fmt.Fprintf(w, "{}")
 		return
@@ -235,7 +233,7 @@ type Conn struct {
 	ip string
 }
 
-var poolConn = sync.Pool{
+/*var poolConn = sync.Pool{
 	New: func() interface{} {
 		return new(Conn)
 	},
@@ -251,7 +249,7 @@ func acquireConn() *Conn {
 func releaseConn(conn *Conn) {
 	conn.Conn = nil
 	poolConn.Put(conn)
-}
+}*/
 
 // IP returns the client's ip address
 func (conn *Conn) IP() string {

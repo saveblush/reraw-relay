@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/bytedance/sonic"
+	"github.com/goccy/go-json"
 	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 
@@ -205,7 +205,7 @@ func (r *repository) Count(db *gorm.DB, req *Request) (*int64, error) {
 }
 
 func (r *repository) Insert(db *gorm.DB, req *models.RelayEvent) error {
-	tags, errTags := sonic.Marshal(&req.Tags)
+	tags, errTags := json.Marshal(&req.Tags)
 	if errTags != nil {
 		return errTags
 	}

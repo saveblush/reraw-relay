@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/fsnotify/fsnotify"
+	"github.com/goccy/go-json"
 	"github.com/spf13/viper"
 
 	"github.com/saveblush/reraw-relay/core/utils/logger"
@@ -193,7 +193,7 @@ func initConfigAvailable() error {
 // SetConfigAvailableStatus set config available status
 // สร้าง config สถานะ ปิด/เปิด ระบบ
 func (cf *Configs) SetConfigAvailableStatus(status string) error {
-	d, _ := sonic.Marshal(&AvailableConfig{
+	d, _ := json.Marshal(&AvailableConfig{
 		Status: status,
 	})
 	p := fmt.Sprintf("%s/%s", filePath, fileNameConfigAvailableStatus)

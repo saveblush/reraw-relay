@@ -3,7 +3,7 @@ package generic
 import (
 	"reflect"
 
-	"github.com/bytedance/sonic"
+	"github.com/goccy/go-json"
 )
 
 // IsEmpty is empty
@@ -32,12 +32,12 @@ func IsEmpty(i interface{}) bool {
 
 // ConvertInterfaceToStruct convert interface to struct
 func ConvertInterfaceToStruct(data, value interface{}) error {
-	b, err := sonic.Marshal(&data)
+	b, err := json.Marshal(&data)
 	if err != nil {
 		return err
 	}
 
-	err = sonic.Unmarshal(b, &value)
+	err = json.Unmarshal(b, &value)
 	if err != nil {
 		return err
 	}
