@@ -1,25 +1,34 @@
 package relay
 
 import (
-	"github.com/coder/websocket/wsjson"
+	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
 
+	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 )
 
 // websocket response
-func (s *service) response(v interface{}) error {
-	s.muRes.Lock()
-	defer s.muRes.Unlock()
+func (s *service) response(envelope nostr.Envelope) error {
+	//s.muRes.Lock()
+	//defer s.muRes.Unlock()
 
-	err := wsjson.Write(s.ctx, s.Conn.Conn, v)
+	/*err := wsjson.Write(s.ctx, s.Conn.Conn, v)
 	if err != nil {
 		logger.Log.Errorf("write msg error: %s", err)
 		return err
 	}
 	//logger.Log.Info("response msg: ", v)
 
-	return err
+	return err*/
+
+	b, err := envelope.MarshalJSON()
+	if err != nil {
+		logger.Log.Errorf("write msg error: %s", err)
+		return err
+	}
+
+	return s.Conn.Write(s.ctx, websocket.MessageText, b)
 }
 
 func (s *service) responseEvent(subID string, evt *nostr.Event) error {
@@ -61,7 +70,7 @@ func (s *service) responseClosed(subID, reason string) error {
 
 // return เมื่อสิ้นสุดการ REQ
 func (s *service) responseEose(subID string) error {
-	err := s.response(nostr.EOSEEnvelope(subID))
+	err := s.response(utils.Pointer(nostr.EOSEEnvelope(subID)))
 	if err != nil {
 		return err
 	}
@@ -70,7 +79,7 @@ func (s *service) responseEose(subID string) error {
 }
 
 func (s *service) responseError(message string) error {
-	err := s.response(nostr.NoticeEnvelope(message))
+	err := s.response(utils.Pointer(nostr.NoticeEnvelope(message)))
 	if err != nil {
 		return err
 	}
