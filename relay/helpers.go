@@ -1,8 +1,7 @@
 package relay
 
 import (
-	"fmt"
-
+	"github.com/goccy/go-json"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/generic"
@@ -26,16 +25,14 @@ func (s *service) isOlder(previous, next *nostr.Event) bool {
 }
 
 func (s *service) subID(env interface{}) (string, error) {
-	var d []interface{}
+	var d []json.RawMessage
 	generic.ConvertInterfaceToStruct(env, &d)
 
-	if len(d) < 2 {
-		return "", errInvalidClose
+	var subID string
+	err := json.Unmarshal(d[1], &subID)
+	if err != nil {
+		return "", errGetSubID
 	}
 
-	if generic.IsEmpty(d[1]) {
-		return "", errSubIDNotFound
-	}
-
-	return fmt.Sprintf("%s", d[1]), nil
+	return string(d[1]), nil
 }

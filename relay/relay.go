@@ -31,6 +31,7 @@ var (
 	errInvalidClose    = errors.New("error: invalid CLOSE")
 	errUnknownCommand  = errors.New("error: unknown command")
 	errSubIDNotFound   = errors.New("error: subscription id not found")
+	errGetSubID        = errors.New("error: received subscription id is not a string")
 )
 
 type StoreEvent []func(cctx *cctx.Context, evt *nostr.Event) error
@@ -114,26 +115,25 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	// ws
 	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
+		CompressionMode:    websocket.CompressionContextTakeover,
 	})
 	if err != nil {
 		logger.Log.Error("ws accept error: %s", err)
 		return
 	}
+	defer ws.CloseNow()
 
 	conn := &Conn{
 		Conn: ws,
 		ip:   rl.ip(r),
 	}
+	logger.Log.Infof("%s connected", conn.ip)
 
 	// config ws
 	if rl.MessageLengthLimit <= 0 {
 		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
 	}
-	conn.SetReadLimit(rl.MessageLengthLimit)
-
-	defer func() {
-		ws.CloseNow()
-	}()
+	conn.Conn.SetReadLimit(rl.MessageLengthLimit)
 
 	// handle event nostr
 	rt := newHandleEvent()
@@ -170,6 +170,8 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}(msg)
 	}
+
+	defer logger.Log.Infof("%s disconnect", conn.ip)
 }
 
 // ip get the client's ip address

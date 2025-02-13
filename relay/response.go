@@ -10,18 +10,6 @@ import (
 
 // websocket response
 func (s *service) response(envelope nostr.Envelope) error {
-	//s.muRes.Lock()
-	//defer s.muRes.Unlock()
-
-	/*err := wsjson.Write(s.ctx, s.Conn.Conn, v)
-	if err != nil {
-		logger.Log.Errorf("write msg error: %s", err)
-		return err
-	}
-	//logger.Log.Info("response msg: ", v)
-
-	return err*/
-
 	b, err := envelope.MarshalJSON()
 	if err != nil {
 		logger.Log.Errorf("write msg error: %s", err)
