@@ -8,6 +8,9 @@ import (
 
 // websocket response
 func (s *service) response(envelope nostr.Envelope) error {
+	s.muRes.Lock()
+	defer s.muRes.Unlock()
+
 	return s.Conn.WriteJSON(envelope)
 }
 
