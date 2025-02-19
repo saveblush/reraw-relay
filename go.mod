@@ -3,9 +3,9 @@ module github.com/saveblush/reraw-relay
 go 1.23.1
 
 require (
-	github.com/coder/websocket v1.8.12
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/goccy/go-json v0.10.5
+	github.com/gorilla/websocket v1.5.3
 	github.com/jinzhu/copier v0.4.0
 	github.com/nbd-wtf/go-nostr v0.49.7
 	github.com/robfig/cron/v3 v3.0.1
@@ -18,6 +18,7 @@ require (
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
+	github.com/coder/websocket v1.8.12 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect

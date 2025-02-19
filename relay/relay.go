@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	"github.com/coder/websocket"
 	"github.com/goccy/go-json"
+	"github.com/gorilla/websocket"
 	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
@@ -20,18 +21,21 @@ import (
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
 
-var (
+const (
 	defaultMessageLengthLimit = 1024 * 1024 * 0.5
+
+	// Time allowed to read the next pong message from the client.
+	pongWait = 60 * time.Second
 )
 
 var (
 	errConnectDatabase = errors.New("error: could not connect to the database")
 	errInvalidMessage  = errors.New("error: invalid message")
 	errDuplicate       = errors.New("duplicate: already have this event")
-	errInvalidClose    = errors.New("error: invalid CLOSE")
-	errUnknownCommand  = errors.New("error: unknown command")
-	errSubIDNotFound   = errors.New("error: subscription id not found")
-	errGetSubID        = errors.New("error: received subscription id is not a string")
+	//errInvalidClose    = errors.New("error: invalid CLOSE")
+	errUnknownCommand = errors.New("error: unknown command")
+	errSubIDNotFound  = errors.New("error: subscription id not found")
+	errGetSubID       = errors.New("error: received subscription id is not a string")
 )
 
 type StoreEvent []func(cctx *cctx.Context, evt *nostr.Event) error
@@ -42,11 +46,13 @@ type RejectEvent []func(cctx *cctx.Context, evt *nostr.Event) (reject bool, msg 
 type Relay struct {
 	serveMux *http.ServeMux
 	ctx      context.Context
+	upgrader websocket.Upgrader
 	policies policies.Service
 
 	ServiceURL string
 	Info       *nip11.RelayInformationDocument
 
+	HandshakeTimeout   time.Duration
 	MessageLengthLimit int64
 }
 
@@ -58,9 +64,18 @@ func NewRelay() *Relay {
 	rl := &Relay{
 		serveMux: &http.ServeMux{},
 		ctx:      context.TODO(),
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:    4096,
+			WriteBufferSize:   4096,
+			EnableCompression: true,
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		},
 		policies: policies.NewService(),
 
 		Info:               nip11,
+		HandshakeTimeout:   90 * time.Second,
 		MessageLengthLimit: int64(config.CF.Info.Limitation.MaxMessageLength),
 	}
 
@@ -112,28 +127,26 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
+	if rl.MessageLengthLimit <= 0 {
+		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
+	}
+
 	// ws
-	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
-		CompressionMode:    websocket.CompressionContextTakeover,
-	})
+	up := rl.upgrader
+	up.HandshakeTimeout = rl.HandshakeTimeout
+	ws, err := up.Upgrade(w, r, nil)
 	if err != nil {
-		logger.Log.Error("ws accept error: %s", err)
+		if _, ok := err.(websocket.HandshakeError); !ok {
+			logger.Log.Error("ws upgrade error: %s", err)
+		}
 		return
 	}
-	defer ws.CloseNow()
 
 	conn := &Conn{
 		Conn: ws,
 		ip:   rl.ip(r),
 	}
-	logger.Log.Infof("%s connected", conn.ip)
-
-	// config ws
-	if rl.MessageLengthLimit <= 0 {
-		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
-	}
-	conn.Conn.SetReadLimit(rl.MessageLengthLimit)
+	logger.Log.Infof("[connected] %s", conn.IP())
 
 	// handle event nostr
 	rt := newHandleEvent()
@@ -142,36 +155,51 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rt.RejectFilter = rejectFilter
 	rt.RejectEvent = rejectEvent
 
-	for {
-		mt, msg, err := conn.Read(rl.ctx)
-		if err != nil {
-			if rl.isUnexpectedCloseError(
-				err,
-				int(websocket.StatusNormalClosure),
-				int(websocket.StatusAbnormalClosure),
-				int(websocket.StatusNoStatusRcvd),
-				int(websocket.StatusGoingAway),
-			) {
-				logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
-			}
-			break
-		}
+	go func() {
+		defer func() {
+			conn.Close()
+			logger.Log.Infof("[disconnect] %s", conn.IP())
+		}()
 
-		if mt != websocket.MessageText {
-			logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
-			break
-		}
+		conn.SetReadLimit(rl.MessageLengthLimit)
+		conn.SetCompressionLevel(9)
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
-		go func(msg []byte) {
-			err = rt.handleEvent(msg)
+		for {
+			mt, msg, err := conn.ReadMessage()
 			if err != nil {
-				logger.Log.Errorf("handle event error: %s", err)
-				return
+				if websocket.IsUnexpectedCloseError(
+					err,
+					websocket.CloseNormalClosure,
+					websocket.CloseAbnormalClosure,
+					websocket.CloseNoStatusReceived,
+					websocket.CloseGoingAway,
+				) {
+					logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
+				}
+				break
 			}
-		}(msg)
-	}
 
-	defer logger.Log.Infof("%s disconnect", conn.ip)
+			if mt != websocket.TextMessage {
+				logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
+				break
+			}
+
+			if mt == websocket.PingMessage {
+				conn.WriteMessage(websocket.PongMessage, nil)
+				continue
+			}
+
+			go func(msg []byte) {
+				err = rt.handleEvent(msg)
+				if err != nil {
+					logger.Log.Errorf("handle event error: %s", err)
+					return
+				}
+			}(msg)
+		}
+	}()
 }
 
 // ip get the client's ip address
@@ -183,19 +211,6 @@ func (rl *Relay) ip(r *http.Request) string {
 	}
 
 	return ip
-}
-
-// isUnexpectedCloseError is unexpected close error
-func (rl *Relay) isUnexpectedCloseError(err error, expectedCodes ...int) bool {
-	if e, ok := err.(*websocket.CloseError); ok {
-		for _, code := range expectedCodes {
-			if int(e.Code) == code {
-				return false
-			}
-		}
-		return true
-	}
-	return false
 }
 
 // showNIP11 show nip11 info
