@@ -23,7 +23,7 @@ import (
 
 const (
 	// Time allowed to read the next pong message from the client.
-	pongWait = 60 * time.Second
+	pongWait = 120 * time.Second
 )
 
 var (
@@ -63,8 +63,8 @@ func NewRelay() *Relay {
 		serveMux: &http.ServeMux{},
 		ctx:      context.TODO(),
 		upgrader: websocket.Upgrader{
-			ReadBufferSize:    4096,
-			WriteBufferSize:   4096,
+			ReadBufferSize:    1024,
+			WriteBufferSize:   1024,
 			EnableCompression: true,
 			CheckOrigin: func(r *http.Request) bool {
 				return true

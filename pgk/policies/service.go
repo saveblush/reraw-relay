@@ -46,23 +46,23 @@ func (s *service) RejectEmptyHeaderUserAgent(r *http.Request) bool {
 // RejectEmptyFilters reject empty filters
 func (s *service) RejectEmptyFilters(filter *nostr.Filter) (reject bool, msg string) {
 	var c int
-	if !generic.IsEmpty(filter.IDs) {
+	if len(filter.IDs) > 0 {
 		c++
 	}
 
-	if !generic.IsEmpty(filter.Kinds) {
+	if len(filter.Kinds) > 0 {
 		c++
 	}
 
-	if !generic.IsEmpty(filter.Authors) {
+	if len(filter.Authors) > 0 {
 		c++
 	}
 
-	if !generic.IsEmpty(filter.Tags) {
+	if len(filter.Tags) > 0 {
 		c++
 	}
 
-	if !generic.IsEmpty(filter.Search) {
+	if filter.Search != "" {
 		c++
 	}
 

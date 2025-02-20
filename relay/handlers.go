@@ -177,19 +177,19 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 			}
 		}
 
-		fetch, err := s.eventstore.FindAll(s.cctx, &eventstore.Request{NostrFilter: &filter})
+		events, err := s.eventstore.FindAll(s.cctx, &eventstore.Request{NostrFilter: &filter})
 		if err != nil {
 			logger.Log.Errorf("find filter [index: %d] error: %s", idx, err)
 			_ = s.responseClosed(subID, errConnectDatabase.Error())
 			return err
 		}
 
-		for _, v := range fetch {
-			_ = s.responseEvent(subID, v)
+		for _, event := range events {
+			_ = s.responseEvent(subID, event)
 		}
-
-		_ = s.responseEose(subID)
 	}
+
+	_ = s.responseEose(subID)
 
 	return nil
 }
@@ -210,6 +210,7 @@ func (s *service) onClose(env interface{}) error {
 }
 
 func (s *service) onCount(subID string, filters *nostr.Filters) error {
+	var total int64
 	for idx, filter := range *filters {
 		count, err := s.nip45.CountEvent(s.cctx, &filter)
 		if err != nil {
@@ -217,11 +218,12 @@ func (s *service) onCount(subID string, filters *nostr.Filters) error {
 			_ = s.responseClosed(subID, errConnectDatabase.Error())
 			return err
 		}
+		total += *count
+	}
 
-		err = s.responseCount(subID, count)
-		if err != nil {
-			return err
-		}
+	err := s.responseCount(subID, &total)
+	if err != nil {
+		return err
 	}
 
 	return nil

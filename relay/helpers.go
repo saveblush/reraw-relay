@@ -34,5 +34,5 @@ func (s *service) subID(env interface{}) (string, error) {
 		return "", errGetSubID
 	}
 
-	return string(d[1]), nil
+	return subID, nil
 }
