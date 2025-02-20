@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/coder/websocket"
 	"github.com/goccy/go-json"
-	"github.com/gorilla/websocket"
 	"github.com/jinzhu/copier"
 	"github.com/nbd-wtf/go-nostr"
 	"github.com/nbd-wtf/go-nostr/nip11"
@@ -21,11 +20,8 @@ import (
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
 
-const (
+var (
 	defaultMessageLengthLimit = 1024 * 1024 * 0.5
-
-	// Time allowed to read the next pong message from the client.
-	pongWait = 60 * time.Second
 )
 
 var (
@@ -46,13 +42,11 @@ type RejectEvent []func(cctx *cctx.Context, evt *nostr.Event) (reject bool, msg 
 type Relay struct {
 	serveMux *http.ServeMux
 	ctx      context.Context
-	upgrader websocket.Upgrader
 	policies policies.Service
 
 	ServiceURL string
 	Info       *nip11.RelayInformationDocument
 
-	HandshakeTimeout   time.Duration
 	MessageLengthLimit int64
 }
 
@@ -64,18 +58,9 @@ func NewRelay() *Relay {
 	rl := &Relay{
 		serveMux: &http.ServeMux{},
 		ctx:      context.TODO(),
-		upgrader: websocket.Upgrader{
-			ReadBufferSize:    4096,
-			WriteBufferSize:   4096,
-			EnableCompression: true,
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		},
 		policies: policies.NewService(),
 
 		Info:               nip11,
-		HandshakeTimeout:   90 * time.Second,
 		MessageLengthLimit: int64(config.CF.Info.Limitation.MaxMessageLength),
 	}
 
@@ -128,25 +113,21 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
 	// ws
-	up := rl.upgrader
-	//up.HandshakeTimeout = rl.HandshakeTimeout
-	ws, err := up.Upgrade(w, r, nil)
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+		CompressionMode:    websocket.CompressionContextTakeover,
+	})
 	if err != nil {
-		if _, ok := err.(websocket.HandshakeError); !ok {
-			logger.Log.Error("ws upgrade error: %s", err)
-		}
+		logger.Log.Error("ws accept error: %s", err)
 		return
 	}
-	defer ws.Close()
+	defer ws.CloseNow()
 
 	// config ws
 	if rl.MessageLengthLimit <= 0 {
 		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
 	}
 	ws.SetReadLimit(rl.MessageLengthLimit)
-	ws.SetCompressionLevel(9)
-	//ws.SetReadDeadline(time.Now().Add(pongWait))
-	//ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
 	conn := &Conn{
 		Conn: ws,
@@ -161,40 +142,24 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rt.RejectFilter = rejectFilter
 	rt.RejectEvent = rejectEvent
 
-	//go func() {
-	/*defer func() {
-		conn.Close()
-		logger.Log.Infof("[disconnect] %s", conn.IP())
-	}()
-
-	conn.SetReadLimit(rl.MessageLengthLimit)
-	conn.SetCompressionLevel(9)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })*/
-
 	for {
-		mt, msg, err := conn.ReadMessage()
+		mt, msg, err := ws.Read(rl.ctx)
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(
+			if rl.isUnexpectedCloseError(
 				err,
-				websocket.CloseNormalClosure,
-				websocket.CloseAbnormalClosure,
-				websocket.CloseNoStatusReceived,
-				websocket.CloseGoingAway,
+				int(websocket.StatusNormalClosure),
+				int(websocket.StatusAbnormalClosure),
+				int(websocket.StatusNoStatusRcvd),
+				int(websocket.StatusGoingAway),
 			) {
 				logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
 			}
 			break
 		}
 
-		if mt != websocket.TextMessage {
+		if mt != websocket.MessageText {
 			logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
 			break
-		}
-
-		if mt == websocket.PingMessage {
-			conn.WriteMessage(websocket.PongMessage, nil)
-			continue
 		}
 
 		go func(msg []byte) {
@@ -205,7 +170,6 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}(msg)
 	}
-	//}()
 
 	defer logger.Log.Infof("[disconnect] %s", conn.IP())
 }
@@ -219,6 +183,19 @@ func (rl *Relay) ip(r *http.Request) string {
 	}
 
 	return ip
+}
+
+// isUnexpectedCloseError is unexpected close error
+func (rl *Relay) isUnexpectedCloseError(err error, expectedCodes ...int) bool {
+	if e, ok := err.(*websocket.CloseError); ok {
+		for _, code := range expectedCodes {
+			if int(e.Code) == code {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // showNIP11 show nip11 info

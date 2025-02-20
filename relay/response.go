@@ -1,17 +1,22 @@
 package relay
 
 import (
+	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/utils"
+	"github.com/saveblush/reraw-relay/core/utils/logger"
 )
 
 // websocket response
 func (s *service) response(envelope nostr.Envelope) error {
-	s.muRes.Lock()
-	defer s.muRes.Unlock()
+	b, err := envelope.MarshalJSON()
+	if err != nil {
+		logger.Log.Errorf("write msg error: %s", err)
+		return err
+	}
 
-	return s.Conn.WriteJSON(envelope)
+	return s.Conn.Write(s.ctx, websocket.MessageText, b)
 }
 
 func (s *service) responseEvent(subID string, evt *nostr.Event) error {
