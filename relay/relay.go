@@ -127,13 +127,9 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
-	if rl.MessageLengthLimit <= 0 {
-		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
-	}
-
 	// ws
 	up := rl.upgrader
-	up.HandshakeTimeout = rl.HandshakeTimeout
+	//up.HandshakeTimeout = rl.HandshakeTimeout
 	ws, err := up.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {
@@ -141,6 +137,16 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	defer ws.Close()
+
+	// config ws
+	if rl.MessageLengthLimit <= 0 {
+		rl.MessageLengthLimit = int64(defaultMessageLengthLimit)
+	}
+	ws.SetReadLimit(rl.MessageLengthLimit)
+	ws.SetCompressionLevel(9)
+	//ws.SetReadDeadline(time.Now().Add(pongWait))
+	//ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
 	conn := &Conn{
 		Conn: ws,
@@ -155,51 +161,53 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rt.RejectFilter = rejectFilter
 	rt.RejectEvent = rejectEvent
 
-	go func() {
-		defer func() {
-			conn.Close()
-			logger.Log.Infof("[disconnect] %s", conn.IP())
-		}()
-
-		conn.SetReadLimit(rl.MessageLengthLimit)
-		conn.SetCompressionLevel(9)
-		conn.SetReadDeadline(time.Now().Add(pongWait))
-		conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
-
-		for {
-			mt, msg, err := conn.ReadMessage()
-			if err != nil {
-				if websocket.IsUnexpectedCloseError(
-					err,
-					websocket.CloseNormalClosure,
-					websocket.CloseAbnormalClosure,
-					websocket.CloseNoStatusReceived,
-					websocket.CloseGoingAway,
-				) {
-					logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
-				}
-				break
-			}
-
-			if mt != websocket.TextMessage {
-				logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
-				break
-			}
-
-			if mt == websocket.PingMessage {
-				conn.WriteMessage(websocket.PongMessage, nil)
-				continue
-			}
-
-			go func(msg []byte) {
-				err = rt.handleEvent(msg)
-				if err != nil {
-					logger.Log.Errorf("handle event error: %s", err)
-					return
-				}
-			}(msg)
-		}
+	//go func() {
+	/*defer func() {
+		conn.Close()
+		logger.Log.Infof("[disconnect] %s", conn.IP())
 	}()
+
+	conn.SetReadLimit(rl.MessageLengthLimit)
+	conn.SetCompressionLevel(9)
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })*/
+
+	for {
+		mt, msg, err := conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(
+				err,
+				websocket.CloseNormalClosure,
+				websocket.CloseAbnormalClosure,
+				websocket.CloseNoStatusReceived,
+				websocket.CloseGoingAway,
+			) {
+				logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
+			}
+			break
+		}
+
+		if mt != websocket.TextMessage {
+			logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
+			break
+		}
+
+		if mt == websocket.PingMessage {
+			conn.WriteMessage(websocket.PongMessage, nil)
+			continue
+		}
+
+		go func(msg []byte) {
+			err = rt.handleEvent(msg)
+			if err != nil {
+				logger.Log.Errorf("handle event error: %s", err)
+				return
+			}
+		}(msg)
+	}
+	//}()
+
+	defer logger.Log.Infof("[disconnect] %s", conn.IP())
 }
 
 // ip get the client's ip address
