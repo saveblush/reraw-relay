@@ -3,6 +3,7 @@ package relay
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/nbd-wtf/go-nostr"
@@ -24,7 +25,7 @@ type service struct {
 	config *config.Configs
 	cctx   *cctx.Context
 	ctx    context.Context
-	//muRes  sync.Mutex
+	muRes  sync.Mutex
 
 	eventstore eventstore.Service
 	nip09      nip09.Service
