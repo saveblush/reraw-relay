@@ -5,17 +5,22 @@ import (
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/utils"
+	"github.com/saveblush/reraw-relay/core/utils/logger"
 )
 
 // websocket response
 func (s *service) response(envelope nostr.Envelope) error {
-	b, _ := envelope.MarshalJSON()
-	return s.Conn.WriteMessage(websocket.TextMessage, b)
-
-	/*s.muRes.Lock()
+	s.muRes.Lock()
 	defer s.muRes.Unlock()
 
-	return s.Conn.WriteJSON(envelope)*/
+	b, err := envelope.MarshalJSON()
+	if err != nil {
+		logger.Log.Errorf("write msg error: %s", err)
+		return err
+	}
+
+	return s.Conn.WriteMessage(websocket.TextMessage, b)
+	//return s.Conn.WriteJSON(envelope)
 }
 
 func (s *service) responseEvent(subID string, evt *nostr.Event) error {
