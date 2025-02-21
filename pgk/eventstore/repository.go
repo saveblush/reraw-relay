@@ -48,25 +48,30 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	conditions = append(conditions, `expired_status = ?`)
 	params = append(params, 0)
 
-	if !generic.IsEmpty(req.NostrFilter.IDs) {
+	if len(req.NostrFilter.IDs) > 0 {
 		for _, v := range req.NostrFilter.IDs {
 			params = append(params, v)
 		}
 		conditions = append(conditions, `id IN (`+makePlaceParams(len(req.NostrFilter.IDs))+`)`)
 	}
 
-	if !generic.IsEmpty(req.NostrFilter.Authors) {
+	if len(req.NostrFilter.Kinds) > 0 {
+		for _, v := range req.NostrFilter.Kinds {
+			params = append(params, v)
+		}
+		conditions = append(conditions, `kind IN (`+makePlaceParams(len(req.NostrFilter.Kinds))+`)`)
+	}
+
+	if len(req.NostrFilter.Authors) > 0 {
 		for _, v := range req.NostrFilter.Authors {
 			params = append(params, v)
 		}
 		conditions = append(conditions, `pubkey IN (`+makePlaceParams(len(req.NostrFilter.Authors))+`)`)
 	}
 
-	if !generic.IsEmpty(req.NostrFilter.Kinds) {
-		for _, v := range req.NostrFilter.Kinds {
-			params = append(params, v)
-		}
-		conditions = append(conditions, `kind IN (`+makePlaceParams(len(req.NostrFilter.Kinds))+`)`)
+	if req.NostrFilter.Search != "" {
+		conditions = append(conditions, `content LIKE ?`)
+		params = append(params, `%`+strings.ReplaceAll(req.NostrFilter.Search, `%`, `\%`)+`%`)
 	}
 
 	if !generic.IsEmpty(req.NostrFilter.Since) {
@@ -77,11 +82,6 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	if !generic.IsEmpty(req.NostrFilter.Until) {
 		conditions = append(conditions, `created_at <= ?`)
 		params = append(params, req.NostrFilter.Until)
-	}
-
-	if !generic.IsEmpty(req.NostrFilter.Search) {
-		conditions = append(conditions, `content LIKE ?`)
-		params = append(params, `%`+strings.ReplaceAll(req.NostrFilter.Search, `%`, `\%`)+`%`)
 	}
 
 	tagQuery := make([]string, 0, 1)
