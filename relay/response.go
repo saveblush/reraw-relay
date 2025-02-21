@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"github.com/gorilla/websocket"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/utils"
@@ -8,10 +9,13 @@ import (
 
 // websocket response
 func (s *service) response(envelope nostr.Envelope) error {
-	s.muRes.Lock()
+	b, _ := envelope.MarshalJSON()
+	return s.Conn.WriteMessage(websocket.TextMessage, b)
+
+	/*s.muRes.Lock()
 	defer s.muRes.Unlock()
 
-	return s.Conn.WriteJSON(envelope)
+	return s.Conn.WriteJSON(envelope)*/
 }
 
 func (s *service) responseEvent(subID string, evt *nostr.Event) error {
