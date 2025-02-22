@@ -165,17 +165,6 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	rt.RejectFilter = rejectFilter
 	rt.RejectEvent = rejectEvent
 
-	//go func() {
-	/*defer func() {
-		conn.Close()
-		logger.Log.Infof("[disconnect] %s", conn.IP())
-	}()
-
-	conn.SetReadLimit(rl.MessageLengthLimit)
-	conn.SetCompressionLevel(9)
-	conn.SetReadDeadline(time.Now().Add(pongWait))
-	conn.SetPongHandler(func(string) error { conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })*/
-
 	for {
 		mt, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -209,7 +198,6 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 			}
 		}(msg)
 	}
-	//}()
 }
 
 // ip get the client's ip address

@@ -1,6 +1,7 @@
 package eventstore
 
 import (
+	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -40,14 +41,11 @@ func makePlaceParams(n int) string {
 }
 
 func (r *repository) query(req *Request) (string, []any, error) {
-	//now := utils.Now().Unix()
 	var conditions []string
 	var params []any
 
-	conditions = append(conditions, `(deleted_at IS NULL)`)
-
-	//conditions = append(conditions, `expired_status = ?`)
-	//params = append(params, 0)
+	conditions = append(conditions, `(deleted_at IS NULL AND (CASE WHEN `+strconv.Itoa(int(utils.Now().Unix()))+` > expiration THEN 1 ELSE 0 END) = ?)`)
+	params = append(params, 0)
 
 	if len(req.NostrFilter.IDs) > 0 {
 		for _, v := range req.NostrFilter.IDs {
@@ -131,16 +129,8 @@ func (r *repository) query(req *Request) (string, []any, error) {
 		sqlOrderBy = "ORDER BY created_at DESC, id"
 	}
 
-	/*sqlFrom := `
-		(SELECT
-		CASE WHEN ` + strconv.Itoa(int(now)) + ` > expiration THEN 1
-		ELSE 0 END as expired_status, *
-		FROM ` + models.RelayEvent{}.TableName() + `) as tbl
-	`*/
-	sqlFrom := models.RelayEvent{}.TableName()
-
 	sql := `SELECT ` + sqlField + `
-	FROM ` + sqlFrom + ` 
+	FROM ` + models.RelayEvent{}.TableName() + ` 
 	WHERE ` + strings.Join(conditions, " AND ") + `
 	` + sqlOrderBy + ` ` + sqlLimit
 
