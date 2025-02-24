@@ -76,6 +76,9 @@ func (s *service) handleEvent(msg []byte) error {
 
 	json.Unmarshal(*req[0], &cmd)
 
+	logger.Log.Info("cmd ", cmd)
+	logger.Log.Info("msg: ", string(msg))
+
 	switch cmd {
 	case "EVENT":
 		err := s.onEvent(req)
