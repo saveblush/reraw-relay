@@ -1,30 +1,29 @@
 package relay
 
 import (
+	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
-	"github.com/nbd-wtf/go-nostr"
 
-	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
+	"github.com/saveblush/reraw-relay/models"
 )
 
 // websocket response
-func (s *service) response(envelope nostr.Envelope) error {
-	s.muRes.Lock()
-	defer s.muRes.Unlock()
+func (s *service) response(msg interface{}) error {
+	s.respMutex.Lock()
+	defer s.respMutex.Unlock()
 
-	b, err := envelope.MarshalJSON()
+	b, err := json.Marshal(&msg)
 	if err != nil {
 		logger.Log.Errorf("write msg error: %s", err)
 		return err
 	}
 
 	return s.Conn.WriteMessage(websocket.TextMessage, b)
-	//return s.Conn.WriteJSON(envelope)
 }
 
-func (s *service) responseEvent(subID string, evt *nostr.Event) error {
-	err := s.response(&nostr.EventEnvelope{SubscriptionID: &subID, Event: *evt})
+func (s *service) responseEvent(subID string, evt *models.Event) error {
+	err := s.response([]interface{}{"EVENT", subID, &evt})
 	if err != nil {
 		return err
 	}
@@ -32,8 +31,8 @@ func (s *service) responseEvent(subID string, evt *nostr.Event) error {
 	return nil
 }
 
-func (s *service) responseOK(eventID string, isSuccess bool, reason string) error {
-	err := s.response(&nostr.OKEnvelope{EventID: eventID, OK: isSuccess, Reason: reason})
+func (s *service) responseOK(eventID string, isSuccess bool, message string) error {
+	err := s.response([]interface{}{"OK", eventID, isSuccess, message})
 	if err != nil {
 		return err
 	}
@@ -42,7 +41,7 @@ func (s *service) responseOK(eventID string, isSuccess bool, reason string) erro
 }
 
 func (s *service) responseCount(subID string, count *int64) error {
-	err := s.response(&nostr.CountEnvelope{SubscriptionID: subID, Count: count})
+	err := s.response([]interface{}{"COUNT", subID, count})
 	if err != nil {
 		return err
 	}
@@ -51,8 +50,8 @@ func (s *service) responseCount(subID string, count *int64) error {
 }
 
 // return ปิดการเชื่อมต่อ
-func (s *service) responseClosed(subID, reason string) error {
-	err := s.response(&nostr.ClosedEnvelope{SubscriptionID: subID, Reason: reason})
+func (s *service) responseClosed(subID, message string) error {
+	err := s.response([]interface{}{"CLOSED", subID, message})
 	if err != nil {
 		return err
 	}
@@ -62,7 +61,7 @@ func (s *service) responseClosed(subID, reason string) error {
 
 // return เมื่อสิ้นสุดการ REQ
 func (s *service) responseEose(subID string) error {
-	err := s.response(utils.Pointer(nostr.EOSEEnvelope(subID)))
+	err := s.response([]interface{}{"EOSE", subID})
 	if err != nil {
 		return err
 	}
@@ -71,7 +70,7 @@ func (s *service) responseEose(subID string) error {
 }
 
 func (s *service) responseError(message string) error {
-	err := s.response(utils.Pointer(nostr.NoticeEnvelope(message)))
+	err := s.response([]interface{}{"NOTICE", message})
 	if err != nil {
 		return err
 	}

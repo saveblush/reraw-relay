@@ -1,11 +1,9 @@
 package nip45
 
 import (
-	"github.com/nbd-wtf/go-nostr"
-
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
-	"github.com/saveblush/reraw-relay/core/generic"
+	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/eventstore"
 )
 
@@ -16,7 +14,7 @@ type ResCountEvent struct {
 
 // Service service interface
 type Service interface {
-	CountEvent(c *cctx.Context, req *nostr.Filter) (*int64, error)
+	CountEvent(c *cctx.Context, req *models.Filter) (*int64, error)
 }
 
 type service struct {
@@ -31,9 +29,9 @@ func NewService() Service {
 	}
 }
 
-func (s *service) CountEvent(c *cctx.Context, req *nostr.Filter) (*int64, error) {
+func (s *service) CountEvent(c *cctx.Context, req *models.Filter) (*int64, error) {
 	var noLimit bool
-	if generic.IsEmpty(req.Limit) {
+	if req.Limit == 0 {
 		noLimit = true
 	}
 

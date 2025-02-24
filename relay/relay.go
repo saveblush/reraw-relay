@@ -6,40 +6,42 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/copier"
-	"github.com/nbd-wtf/go-nostr"
-	"github.com/nbd-wtf/go-nostr/nip11"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
+	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
 
 const (
-	// Time allowed to read the next pong message from the client.
 	pongWait = 120 * time.Second
 )
 
 var (
-	errConnectDatabase = errors.New("error: could not connect to the database")
-	errInvalidMessage  = errors.New("error: invalid message")
-	errDuplicate       = errors.New("duplicate: already have this event")
-	//errInvalidClose    = errors.New("error: invalid CLOSE")
-	errUnknownCommand = errors.New("error: unknown command")
-	errSubIDNotFound  = errors.New("error: subscription id not found")
-	errGetSubID       = errors.New("error: received subscription id is not a string")
+	errConnectDatabase      = errors.New("error: could not connect to the database")
+	errInvalidMessage       = errors.New("error: invalid message")
+	errInvalidParamsMessage = errors.New("error: request has less than 2 parameters")
+	errInvalidReq           = errors.New("error: invalid REQ")
+	errInvalidFilter        = errors.New("error: failed to decode filter")
+	errInvalidEvent         = errors.New("error: failed to decode event")
+	errDuplicate            = errors.New("duplicate: already have this event")
+	errUnknownCommand       = errors.New("error: unknown command")
+	errSubIDNotFound        = errors.New("error: subscription id not found")
+	errGetSubID             = errors.New("error: received subscription id is not a string")
 )
 
-type StoreEvent []func(cctx *cctx.Context, evt *nostr.Event) error
+type StoreEvent []func(cctx *cctx.Context, evt *models.Event) error
 type RejectConnection []func(r *http.Request) bool
-type RejectFilter []func(filter *nostr.Filter) (reject bool, msg string)
-type RejectEvent []func(cctx *cctx.Context, evt *nostr.Event) (reject bool, msg string)
+type RejectFilter []func(filter *models.Filter) (reject bool, msg string)
+type RejectEvent []func(cctx *cctx.Context, evt *models.Event) (reject bool, msg string)
 
 type Relay struct {
 	serveMux *http.ServeMux
@@ -48,15 +50,18 @@ type Relay struct {
 	policies policies.Service
 
 	ServiceURL string
-	Info       *nip11.RelayInformationDocument
+	Info       *models.RelayInformationDocument
 
 	HandshakeTimeout   time.Duration
 	MessageLengthLimit int64
+
+	clientsMutex sync.Mutex
+	clients      map[*websocket.Conn]struct{}
 }
 
 // NewRelay new relay
 func NewRelay() *Relay {
-	nip11 := &nip11.RelayInformationDocument{}
+	nip11 := &models.RelayInformationDocument{}
 	copier.Copy(nip11, &config.CF.Info)
 
 	rl := &Relay{
@@ -75,6 +80,8 @@ func NewRelay() *Relay {
 		Info:               nip11,
 		HandshakeTimeout:   180 * time.Second,
 		MessageLengthLimit: 1024 * 1024 * 0.5,
+
+		clients: make(map[*websocket.Conn]struct{}),
 	}
 
 	return rl
@@ -85,6 +92,20 @@ func (rl *Relay) Serve() *http.ServeMux {
 	mux.HandleFunc("/", rl.handleRequest)
 
 	return mux
+}
+
+// CloseRelay close relay
+func (rl *Relay) CloseRelay() error {
+	rl.clientsMutex.Lock()
+	defer rl.clientsMutex.Unlock()
+
+	for c := range rl.clients {
+		c.WriteControl(websocket.CloseMessage, nil, time.Now().Add(time.Second))
+		c.Close()
+	}
+	clear(rl.clients)
+
+	return nil
 }
 
 // handleRequest handle request
@@ -139,7 +160,12 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() {
-		ws.Close()
+		rl.clientsMutex.Lock()
+		if _, ok := rl.clients[ws]; ok {
+			ws.Close()
+			delete(rl.clients, ws)
+		}
+		rl.clientsMutex.Unlock()
 		logger.Log.Infof("[disconnect] %s", ip)
 	}()
 
@@ -157,6 +183,11 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 		ip:   ip,
 	}
 	logger.Log.Infof("[connected] %s", ip)
+
+	// clients ws
+	rl.clientsMutex.Lock()
+	rl.clients[ws] = struct{}{}
+	rl.clientsMutex.Unlock()
 
 	// handle event nostr
 	rt := newHandleEvent()
@@ -236,10 +267,11 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 	var str []string
 	str = append(str, fmt.Sprintf("Name: %s", rl.Info.Name))
 	str = append(str, fmt.Sprintf("Description: %s", rl.Info.Description))
-	str = append(str, fmt.Sprintf("PubKey: %s", rl.Info.PubKey))
+	str = append(str, fmt.Sprintf("PubKey: %s", rl.Info.Pubkey))
 	str = append(str, fmt.Sprintf("Contact: %s", rl.Info.Contact))
 	str = append(str, fmt.Sprintf("SupportedNIPs: %s", strings.Join(arrSupportedNIPs, ", ")))
 	str = append(str, fmt.Sprintf("Version: %s", rl.Info.Version))
+
 	fmt.Fprint(w, strings.Join(str, "\n"))
 }
 
@@ -247,24 +279,6 @@ type Conn struct {
 	*websocket.Conn
 	ip string
 }
-
-/*var poolConn = sync.Pool{
-	New: func() interface{} {
-		return new(Conn)
-	},
-}
-
-// acquireConn acquire conn from pool
-func acquireConn() *Conn {
-	conn := poolConn.Get().(*Conn)
-	return conn
-}
-
-// releaseConn return conn to pool
-func releaseConn(conn *Conn) {
-	conn.Conn = nil
-	poolConn.Put(conn)
-}*/
 
 // IP returns the client's ip address
 func (conn *Conn) IP() string {

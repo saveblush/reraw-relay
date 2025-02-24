@@ -7,8 +7,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/goccy/go-json"
-	"github.com/jinzhu/copier"
-	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
@@ -18,13 +16,13 @@ import (
 
 // repository interface
 type Repository interface {
-	Find(db *gorm.DB, req *Request) (*nostr.Event, error)
-	FindAll(db *gorm.DB, req *Request) ([]*nostr.Event, error)
-	FindByID(db *gorm.DB, ID string) (*models.RelayEvent, error)
+	Find(db *gorm.DB, req *Request) (*models.Event, error)
+	FindAll(db *gorm.DB, req *Request) ([]*models.Event, error)
+	FindByID(db *gorm.DB, ID string) (*models.Event, error)
 	Count(db *gorm.DB, req *Request) (*int64, error)
-	Insert(db *gorm.DB, req *models.RelayEvent) error
-	SoftDelete(db *gorm.DB, req *models.RelayEvent) error
-	Delete(db *gorm.DB, req *models.RelayEvent) error
+	Insert(db *gorm.DB, req *models.Event) error
+	SoftDelete(db *gorm.DB, req *models.Event) error
+	Delete(db *gorm.DB, req *models.Event) error
 	InsertBlacklist(db *gorm.DB, req *models.Blacklist) error
 	FindBlacklists(db *gorm.DB, req *models.Blacklist) ([]*models.Blacklist, error)
 }
@@ -130,47 +128,45 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	}
 
 	sql := `SELECT ` + sqlField + `
-	FROM ` + models.RelayEvent{}.TableName() + ` 
+	FROM ` + models.Event{}.TableName() + ` 
 	WHERE ` + strings.Join(conditions, " AND ") + `
 	` + sqlOrderBy + ` ` + sqlLimit
 
 	return sql, params, nil
 }
 
-func (r *repository) Find(db *gorm.DB, req *Request) (*nostr.Event, error) {
-	fetch, err := r.FindAll(db, req)
-	if err != nil {
-		return nil, err
-	}
-
-	entities := &nostr.Event{}
-	for _, v := range fetch {
-		entities = v
-	}
-
-	return entities, nil
-}
-
-func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*nostr.Event, error) {
+func (r *repository) Find(db *gorm.DB, req *Request) (*models.Event, error) {
 	sql, params, err := r.query(req)
 	if err != nil {
 		return nil, err
 	}
 
-	v := []*models.RelayEvent{}
-	err = db.Raw(sql, params...).Scan(&v).Error
+	entities := &models.Event{}
+	err = db.Limit(1).Raw(sql, params...).Scan(entities).Error
 	if err != nil {
 		return nil, err
 	}
 
-	entities := []*nostr.Event{}
-	copier.Copy(&entities, &v)
+	return entities, nil
+}
+
+func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*models.Event, error) {
+	sql, params, err := r.query(req)
+	if err != nil {
+		return nil, err
+	}
+
+	entities := []*models.Event{}
+	err = db.Raw(sql, params...).Scan(&entities).Error
+	if err != nil {
+		return nil, err
+	}
 
 	return entities, nil
 }
 
-func (r *repository) FindByID(db *gorm.DB, ID string) (*models.RelayEvent, error) {
-	entities := &models.RelayEvent{}
+func (r *repository) FindByID(db *gorm.DB, ID string) (*models.Event, error) {
+	entities := &models.Event{}
 	err := db.Limit(1).Where("id = ?", ID).Find(entities).Error
 	if err != nil {
 		return nil, err
@@ -194,7 +190,7 @@ func (r *repository) Count(db *gorm.DB, req *Request) (*int64, error) {
 	return entities, nil
 }
 
-func (r *repository) Insert(db *gorm.DB, req *models.RelayEvent) error {
+func (r *repository) Insert(db *gorm.DB, req *models.Event) error {
 	tags, errTags := json.Marshal(&req.Tags)
 	if errTags != nil {
 		return errTags
@@ -208,12 +204,12 @@ func (r *repository) Insert(db *gorm.DB, req *models.RelayEvent) error {
 		"content":    req.Content,
 		"tags":       tags,
 		"sig":        req.Sig,
-		"expiration": generic.ConvertEmptyToNull(req.Expiration),
-		"updated_ip": generic.ConvertEmptyToNull(req.UpdatedIP),
-		"updated_at": generic.ConvertEmptyToNull(req.UpdatedAt),
-		"deleted_at": generic.ConvertEmptyToNull(req.DeletedAt),
+		"expiration": req.Expiration,
+		"updated_ip": req.UpdatedIP,
+		"updated_at": req.UpdatedAt,
+		"deleted_at": req.DeletedAt,
 	}
-	err := db.Model(&models.RelayEvent{}).Create(&data).Error
+	err := db.Model(&models.Event{}).Create(&data).Error
 	if err != nil {
 		return err
 	}
@@ -221,8 +217,8 @@ func (r *repository) Insert(db *gorm.DB, req *models.RelayEvent) error {
 	return nil
 }
 
-func (r *repository) SoftDelete(db *gorm.DB, req *models.RelayEvent) error {
-	err := db.Model(&req).Select("DeletedAt").Updates(&models.RelayEvent{DeletedAt: nostr.Timestamp(utils.Now().Unix())}).Error
+func (r *repository) SoftDelete(db *gorm.DB, req *models.Event) error {
+	err := db.Model(&req).Select("DeletedAt").Updates(&models.Event{DeletedAt: utils.Pointer(models.Timestamp(utils.Now().Unix()))}).Error
 	if err != nil {
 		return err
 	}
@@ -230,7 +226,7 @@ func (r *repository) SoftDelete(db *gorm.DB, req *models.RelayEvent) error {
 	return nil
 }
 
-func (r *repository) Delete(db *gorm.DB, req *models.RelayEvent) error {
+func (r *repository) Delete(db *gorm.DB, req *models.Event) error {
 	err := db.Delete(&req).Error
 	if err != nil {
 		return err

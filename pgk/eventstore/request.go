@@ -1,9 +1,9 @@
 package eventstore
 
-import "github.com/nbd-wtf/go-nostr"
+import "github.com/saveblush/reraw-relay/models"
 
 type Request struct {
-	NostrFilter *nostr.Filter
+	NostrFilter *models.Filter
 	DoCount     bool
 	NoLimit     bool
 }

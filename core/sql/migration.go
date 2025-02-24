@@ -47,17 +47,6 @@ func createDatabase(cf *Configuration) error {
 func Migration(db *gorm.DB) error {
 	var sqls []string
 	sqls = append(sqls, `
-		CREATE TABLE IF NOT EXISTS users (
-			pubkey varchar(64) NOT NULL PRIMARY KEY,
-			created_at integer DEFAULT NULL,
-			updated_at integer DEFAULT NULL,
-			deleted_at integer DEFAULT NULL,
-			name text DEFAULT NULL,
-			lightning_url text DEFAULT NULL
-		);
-	`)
-
-	sqls = append(sqls, `
 		CREATE OR REPLACE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
 			AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(t->>0) = 1;'
 			LANGUAGE SQL
@@ -92,10 +81,6 @@ func Migration(db *gorm.DB) error {
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_kind ON events (kind);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_tagvalues ON events USING gin (tagvalues);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_expiration ON events (expiration);`)
-
-	// index users
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_deleted_at ON users (deleted_at);`)
-	sqls = append(sqls, "CREATE INDEX IF NOT EXISTS idx_name ON users USING gin (to_tsvector('simple', name));")
 
 	for _, sql := range sqls {
 		err := db.Exec(sql).Error

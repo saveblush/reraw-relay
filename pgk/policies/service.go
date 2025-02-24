@@ -1,13 +1,13 @@
 package policies
 
 import (
+	"fmt"
 	"net/http"
-
-	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
+	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/eventstore"
 	"github.com/saveblush/reraw-relay/pgk/nips/nip13"
 )
@@ -15,13 +15,13 @@ import (
 // Service service interface
 type Service interface {
 	RejectEmptyHeaderUserAgent(r *http.Request) bool
-	RejectEmptyFilters(filter *nostr.Filter) (reject bool, msg string)
-	RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (bool, string)
-	RejectValidateEvent(c *cctx.Context, evt *nostr.Event) (bool, string)
-	RejectValidatePow(c *cctx.Context, evt *nostr.Event) (bool, string)
-	RejectValidateTimeStamp(c *cctx.Context, evt *nostr.Event) (bool, string)
-	RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *nostr.Event) (bool, string)
-	StoreBlacklistWithContent(c *cctx.Context, evt *nostr.Event) error
+	RejectEmptyFilters(filter *models.Filter) (reject bool, msg string)
+	RejectEventWithCharacter(c *cctx.Context, evt *models.Event) (bool, string)
+	RejectValidateEvent(c *cctx.Context, evt *models.Event) (bool, string)
+	RejectValidatePow(c *cctx.Context, evt *models.Event) (bool, string)
+	RejectValidateTimeStamp(c *cctx.Context, evt *models.Event) (bool, string)
+	RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *models.Event) (bool, string)
+	StoreBlacklistWithContent(c *cctx.Context, evt *models.Event) error
 }
 
 type service struct {
@@ -44,7 +44,7 @@ func (s *service) RejectEmptyHeaderUserAgent(r *http.Request) bool {
 }
 
 // RejectEmptyFilters reject empty filters
-func (s *service) RejectEmptyFilters(filter *nostr.Filter) (reject bool, msg string) {
+func (s *service) RejectEmptyFilters(filter *models.Filter) (reject bool, msg string) {
 	var c int
 	if len(filter.IDs) > 0 {
 		c++
@@ -75,7 +75,7 @@ func (s *service) RejectEmptyFilters(filter *nostr.Filter) (reject bool, msg str
 	}
 
 	if c == 0 {
-		return true, nostr.NormalizeOKMessage("can't handle empty filters", "blocked")
+		return true, fmt.Sprintf("blocked: %s", "can't handle empty filters")
 	}
 
 	return false, ""

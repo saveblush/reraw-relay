@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/nbd-wtf/go-nostr"
-
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/generic"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
@@ -13,8 +11,8 @@ import (
 )
 
 // RejectValidateEvent reject validate event
-func (s *service) RejectValidateEvent(c *cctx.Context, evt *nostr.Event) (bool, string) {
-	if evt.GetID() != evt.ID {
+func (s *service) RejectValidateEvent(c *cctx.Context, evt *models.Event) (bool, string) {
+	/*if evt.GetID() != evt.ID {
 		return true, nostr.NormalizeOKMessage("event id is computed incorrectly", "invalid")
 	}
 
@@ -23,32 +21,32 @@ func (s *service) RejectValidateEvent(c *cctx.Context, evt *nostr.Event) (bool, 
 		return true, nostr.NormalizeOKMessage("failed to verify signature", "error")
 	} else if !ok {
 		return true, nostr.NormalizeOKMessage("signature is invalid", "invalid")
-	}
+	}*/
 
 	return false, ""
 }
 
 // RejectValidatePow reject validate pow
-func (s *service) RejectValidatePow(c *cctx.Context, evt *nostr.Event) (bool, string) {
+func (s *service) RejectValidatePow(c *cctx.Context, evt *models.Event) (bool, string) {
 	pow, err := s.nip13.VerifyPow(c, evt)
 	if !pow && err != nil {
-		return true, nostr.NormalizeOKMessage(err.Error(), "pow")
+		return true, fmt.Sprintf("pow: %s", err)
 	}
 
 	return false, ""
 }
 
 // RejectValidateTimeStamp reject validate time stamp
-func (s *service) RejectValidateTimeStamp(c *cctx.Context, evt *nostr.Event) (bool, string) {
+func (s *service) RejectValidateTimeStamp(c *cctx.Context, evt *models.Event) (bool, string) {
 	if evt.CreatedAt > models.MaxUint32 || evt.Kind > models.MaxUint16 {
-		return true, nostr.NormalizeOKMessage("format created_at error", "invalid")
+		return true, fmt.Sprintf("invalid: %s", "format created_at error")
 	}
 
 	return false, ""
 }
 
 // RejectEventWithCharacter reject event with character
-func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (bool, string) {
+func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *models.Event) (bool, string) {
 	characters := []string{
 		//"data:image",
 		//"data:video",
@@ -56,7 +54,7 @@ func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (b
 
 	for _, character := range characters {
 		if strings.Contains(evt.Content, character) {
-			return true, nostr.NormalizeOKMessage(fmt.Sprintf("event with %s", character), "blocked")
+			return true, fmt.Sprintf("blocked: event with %s", character)
 		}
 	}
 
@@ -64,22 +62,22 @@ func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *nostr.Event) (b
 }
 
 // RejectEventFromPubkeyWithBlacklist reject event from pubkey with blacklist
-func (s *service) RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *nostr.Event) (bool, string) {
-	bots, err := s.eventstore.FindBlacklists(c, &models.Blacklist{Pubkey: evt.PubKey})
+func (s *service) RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *models.Event) (bool, string) {
+	bots, err := s.eventstore.FindBlacklists(c, &models.Blacklist{Pubkey: evt.Pubkey})
 	if err != nil {
 		logger.Log.Warnf("reject find bot error: %s", err)
 	}
 
 	if !generic.IsEmpty(bots) {
-		logger.Log.Warnf("found bot: %s", evt.PubKey)
-		return true, nostr.NormalizeOKMessage("hmm.", "blocked")
+		logger.Log.Warnf("found bot: %s", evt.Pubkey)
+		return true, fmt.Sprintf("blocked: %s", "hmm.")
 	}
 
 	return false, ""
 }
 
 // StoreBlacklistWithContent store blacklist with content
-func (s *service) StoreBlacklistWithContent(c *cctx.Context, evt *nostr.Event) error {
+func (s *service) StoreBlacklistWithContent(c *cctx.Context, evt *models.Event) error {
 	characters := []string{
 		"ReplyGuy",
 		"ReplyGirl",
@@ -87,7 +85,7 @@ func (s *service) StoreBlacklistWithContent(c *cctx.Context, evt *nostr.Event) e
 
 	for _, character := range characters {
 		if strings.Contains(evt.Content, character) {
-			err := s.eventstore.InsertBlacklist(c, &models.Blacklist{Pubkey: evt.PubKey})
+			err := s.eventstore.InsertBlacklist(c, &models.Blacklist{Pubkey: evt.Pubkey})
 			if err != nil {
 				logger.Log.Errorf("keep bot error: %s", err)
 				return err

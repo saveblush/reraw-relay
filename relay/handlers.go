@@ -3,10 +3,11 @@ package relay
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
-	"github.com/nbd-wtf/go-nostr"
+	"github.com/goccy/go-json"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
@@ -22,10 +23,10 @@ import (
 )
 
 type service struct {
-	config *config.Configs
-	cctx   *cctx.Context
-	ctx    context.Context
-	muRes  sync.Mutex
+	config    *config.Configs
+	cctx      *cctx.Context
+	ctx       context.Context
+	respMutex sync.Mutex
 
 	eventstore eventstore.Service
 	nip09      nip09.Service
@@ -55,46 +56,54 @@ func newHandleEvent() *service {
 
 // handleEvent handle event
 func (s *service) handleEvent(msg []byte) error {
+	var req []*json.RawMessage
+	var cmd string
+
 	start := utils.Now()
-	envelope := nostr.ParseMessage(msg)
-	if envelope == nil {
+	defer func() {
+		logger.Log.Infof("[%s] processed in %s", cmd, time.Since(start))
+	}()
+
+	if err := json.Unmarshal(msg, &req); err != nil {
 		_ = s.responseError(errInvalidMessage.Error())
 		return errInvalidMessage
 	}
-	//logger.Log.Info("parse msg: ", envelope)
 
-	switch env := envelope.(type) {
-	case *nostr.EventEnvelope:
-		err := s.onEvent(&env.Event)
+	if len(req) < 2 {
+		_ = s.responseError(errInvalidParamsMessage.Error())
+		return errInvalidParamsMessage
+	}
+
+	json.Unmarshal(*req[0], &cmd)
+
+	switch cmd {
+	case "EVENT":
+		err := s.onEvent(req)
 		if err != nil {
 			logger.Log.Errorf("[event] error: %s", err)
 			return err
 		}
-		logger.Log.Info("[event] processed in ", time.Since(start))
 
-	case *nostr.ReqEnvelope:
-		err := s.onReq(env.SubscriptionID, &env.Filters)
+	case "REQ":
+		err := s.onReq(req)
 		if err != nil {
 			logger.Log.Errorf("[req] error: %s", err)
 			return err
 		}
-		logger.Log.Info("[req] processed in ", time.Since(start))
 
-	case *nostr.CloseEnvelope:
-		err := s.onClose(env)
+	case "CLOSE":
+		err := s.onClose(req)
 		if err != nil {
 			logger.Log.Errorf("[close] error: %s", err)
 			return err
 		}
-		logger.Log.Info("[close] processed in ", time.Since(start))
 
-	case *nostr.CountEnvelope:
-		err := s.onCount(env.SubscriptionID, &env.Filters)
+	case "COUNT":
+		err := s.onCount(req)
 		if err != nil {
 			logger.Log.Errorf("[count] error: %s", err)
 			return err
 		}
-		logger.Log.Info("[count] processed in ", time.Since(start))
 
 	default:
 		_ = s.responseError(errUnknownCommand.Error())
@@ -104,7 +113,12 @@ func (s *service) handleEvent(msg []byte) error {
 	return nil
 }
 
-func (s *service) onEvent(evt *nostr.Event) error {
+func (s *service) onEvent(req []*json.RawMessage) error {
+	evt, err := s.event(req)
+	if err != nil {
+		return err
+	}
+
 	// check reject
 	for _, rejectFunc := range s.RejectEvent {
 		if reject, msg := rejectFunc(s.cctx, evt); reject {
@@ -114,7 +128,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	}
 
 	// clear older
-	err := s.clearEventOlder(evt)
+	err = s.clearEventOlder(evt)
 	if err != nil {
 		logger.Log.Errorf("clear older error: %s", err)
 		_ = s.responseOK(evt.ID, false, err.Error())
@@ -138,7 +152,7 @@ func (s *service) onEvent(evt *nostr.Event) error {
 		err := storeFunc(s.cctx, evt)
 		if err != nil {
 			logger.Log.Errorf("func store event error: %s", err)
-			_ = s.responseOK(evt.ID, false, nostr.NormalizeOKMessage(err.Error(), "error"))
+			_ = s.responseOK(evt.ID, false, fmt.Sprintf("error: %s", err))
 			return err
 		}
 	}
@@ -167,7 +181,21 @@ func (s *service) onEvent(evt *nostr.Event) error {
 	return nil
 }
 
-func (s *service) onReq(subID string, filters *nostr.Filters) error {
+func (s *service) onReq(req []*json.RawMessage) error {
+	if len(req) < 3 {
+		return errInvalidReq
+	}
+
+	subID, err := s.subID(req)
+	if err != nil {
+		return err
+	}
+
+	filters, err := s.filters(req)
+	if err != nil {
+		return err
+	}
+
 	for idx, filter := range *filters {
 		// check reject
 		for _, rejectFunc := range s.RejectFilter {
@@ -194,8 +222,8 @@ func (s *service) onReq(subID string, filters *nostr.Filters) error {
 	return nil
 }
 
-func (s *service) onClose(env interface{}) error {
-	subID, err := s.subID(env)
+func (s *service) onClose(req []*json.RawMessage) error {
+	subID, err := s.subID(req)
 	if err != nil {
 		_ = s.responseError(err.Error())
 		return err
@@ -209,7 +237,17 @@ func (s *service) onClose(env interface{}) error {
 	return nil
 }
 
-func (s *service) onCount(subID string, filters *nostr.Filters) error {
+func (s *service) onCount(req []*json.RawMessage) error {
+	subID, err := s.subID(req)
+	if err != nil {
+		return err
+	}
+
+	filters, err := s.filters(req)
+	if err != nil {
+		return err
+	}
+
 	var total int64
 	for idx, filter := range *filters {
 		count, err := s.nip45.CountEvent(s.cctx, &filter)
@@ -221,7 +259,7 @@ func (s *service) onCount(subID string, filters *nostr.Filters) error {
 		total += *count
 	}
 
-	err := s.responseCount(subID, &total)
+	err = s.responseCount(subID, &total)
 	if err != nil {
 		return err
 	}
@@ -229,28 +267,28 @@ func (s *service) onCount(subID string, filters *nostr.Filters) error {
 	return nil
 }
 
-func (s *service) clearEventOlder(evt *nostr.Event) error {
+func (s *service) clearEventOlder(evt *models.Event) error {
 	if generic.IsEmpty(evt) {
 		return errors.New("invalid: event not found")
 	}
 
+	filterEvent := &models.Filter{}
 	var isDeleteOlder bool
-	filterEvent := &nostr.Filter{}
 	if s.isEphemeralKind(evt.Kind) {
 		// เหตุการณ์เกิดขึ้นชั่วคราว จะไม่จัดเก็บโดยรีเลย์
 		return nil
 	} else if s.isReplaceableKind(evt.Kind) {
 		// event ที่แก้ไขข้อมูลได้
-		filterEvent = &nostr.Filter{Authors: []string{evt.PubKey}, Kinds: []int{evt.Kind}}
+		filterEvent = &models.Filter{Authors: []string{evt.Pubkey}, Kinds: []int{evt.Kind}}
 		isDeleteOlder = true
 	} else if s.isParamReplaceableKind(evt.Kind) {
 		// NIP-33
 		// เหตุการณ์ที่สามารถแทนที่ด้วยพารามิเตอร์ได้
-		d := evt.Tags.GetFirst([]string{"d", ""})
-		if d == nil {
+		d := evt.Tags.FindKeyD()
+		if d == "" {
 			return errors.New("invalid: missing 'd' tag on parameterized replaceable event")
 		}
-		filterEvent = &nostr.Filter{Authors: []string{evt.PubKey}, Kinds: []int{evt.Kind}, Tags: nostr.TagMap{"d": []string{d.Value()}}}
+		filterEvent = &models.Filter{Authors: []string{evt.Pubkey}, Kinds: []int{evt.Kind}, Tags: models.TagMap{"d": []string{d}}}
 		isDeleteOlder = true
 	}
 
@@ -269,7 +307,7 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 		// ลบ event ที่เก่ากว่า
 		for _, previous := range fetch {
 			if s.isOlder(previous, evt) {
-				err := s.eventstore.Delete(s.cctx, &models.RelayEvent{ID: previous.ID})
+				err := s.eventstore.Delete(s.cctx, &models.Event{ID: previous.ID})
 				if err != nil {
 					logger.Log.Errorf("delete older error: %s", err)
 					return err
@@ -281,9 +319,17 @@ func (s *service) clearEventOlder(evt *nostr.Event) error {
 	return nil
 }
 
-func (s *service) storeEvent(evt *nostr.Event) error {
-	evtAddon := &models.EventAddon{}
-	evtAddon.UpdatedIP = s.Conn.IP()
+func (s *service) storeEvent(evt *models.Event) error {
+	v := &models.Event{
+		ID:        evt.ID,
+		CreatedAt: models.Timestamp(evt.CreatedAt),
+		Pubkey:    evt.Pubkey,
+		Kind:      evt.Kind,
+		Content:   evt.Content,
+		Tags:      evt.Tags,
+		Sig:       evt.Sig,
+		UpdatedIP: utils.Pointer(s.Conn.IP()),
+	}
 
 	// get expiration
 	expiration, err := s.nip40.Expiration(s.cctx, evt)
@@ -292,22 +338,9 @@ func (s *service) storeEvent(evt *nostr.Event) error {
 		return err
 	}
 	if !generic.IsEmpty(expiration) {
-		evtAddon.Expiration = nostr.Timestamp(expiration)
+		v.Expiration = expiration
 	}
 
-	v := &models.RelayEvent{
-		ID:         evt.ID,
-		CreatedAt:  evt.CreatedAt,
-		Pubkey:     evt.PubKey,
-		Kind:       evt.Kind,
-		Content:    evt.Content,
-		Tags:       evt.Tags,
-		Sig:        evt.Sig,
-		Expiration: evtAddon.Expiration,
-		UpdatedIP:  evtAddon.UpdatedIP,
-		UpdatedAt:  evtAddon.UpdatedAt,
-		DeletedAt:  evtAddon.DeletedAt,
-	}
 	err = s.eventstore.Insert(s.cctx, v)
 	if err != nil {
 		logger.Log.Errorf("insert error: %s", err)

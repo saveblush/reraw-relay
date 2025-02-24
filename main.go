@@ -86,6 +86,10 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
+	// Close relay
+	go rl.CloseRelay()
+	logger.Log.Info("Relay closed")
+
 	// Close cron
 	go cron.Stop()
 	logger.Log.Info("Cron closed")
