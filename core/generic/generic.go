@@ -2,6 +2,7 @@ package generic
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/goccy/go-json"
 )
@@ -53,4 +54,91 @@ func ConvertEmptyToNull[T comparable](v T) any {
 	}
 
 	return v
+}
+
+// ConvertInterfaceToSliceString convert interface to slice string
+func ConvertInterfaceToSliceString(i interface{}) []string {
+	if i == nil {
+		return nil
+	}
+
+	arr, ok := i.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var result []string
+	for _, v := range arr {
+		str, ok := v.(string)
+		if ok {
+			result = append(result, str)
+		}
+	}
+
+	return result
+}
+
+// ConvertInterfaceToSliceString convert interface to slice int
+func ConvertInterfaceToSliceInt(i interface{}) []int {
+	if i == nil {
+		return nil
+	}
+
+	arr, ok := i.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	var result []int
+	for _, v := range arr {
+		num, ok := v.(float64)
+		if ok {
+			result = append(result, int(num))
+		}
+	}
+
+	return result
+}
+
+// ConvertInterfaceToSliceString convert interface to string
+func ConvertInterfaceToString(i interface{}) string {
+	if i == nil {
+		return ""
+	}
+
+	result, ok := i.(string)
+	if !ok {
+		return ""
+	}
+
+	return result
+}
+
+// ConvertInterfaceToSliceString convert interface to int
+func ConvertInterfaceToInt(i interface{}) int {
+	if i == nil {
+		return 0
+	}
+
+	result, ok := i.(float64)
+	if !ok {
+		return 0
+	}
+
+	return int(result)
+}
+
+// ConvertInterfaceToTime convert interface to time
+func ConvertInterfaceToTime(i interface{}) *time.Time {
+	if i == nil {
+		return nil
+	}
+
+	result, ok := i.(float64)
+	if !ok {
+		return nil
+	}
+	t := time.Unix(int64(result), 0).UTC()
+
+	return &t
 }

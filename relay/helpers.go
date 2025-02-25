@@ -1,11 +1,9 @@
 package relay
 
 import (
-	"time"
-
 	"github.com/goccy/go-json"
-	"github.com/tidwall/gjson"
 
+	"github.com/saveblush/reraw-relay/core/generic"
 	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/models"
 )
@@ -28,120 +26,22 @@ func (s *service) isOlder(previous, next *models.Event) bool {
 }
 
 func (s *service) subID(req []*json.RawMessage) (string, error) {
-	var subID string
-	err := json.Unmarshal(*req[1], &subID)
+	var id string
+	err := json.Unmarshal(*req[1], &id)
 	if err != nil {
 		return "", errGetSubID
 	}
 
-	return subID, nil
+	return id, nil
 }
 
-func (s *service) setIntArray(i interface{}) []int {
-	if i == nil {
-		return nil
+// parseFilters parse filters
+func (s *service) parseFilters(req []*json.RawMessage) (*models.Filters, error) {
+	if len(req) < 3 {
+		return nil, errInvalidFilter
 	}
 
-	b, err := json.Marshal(i)
-	if err != nil {
-		return nil
-	}
-	arr := gjson.ParseBytes(b).Array()
-
-	var result []int
-	for _, v := range arr {
-		num := v.Num
-		result = append(result, int(num))
-	}
-
-	return result
-}
-
-func (s *service) setStringArray(i interface{}) []string {
-	if i == nil {
-		return nil
-	}
-
-	b, err := json.Marshal(i)
-	if err != nil {
-		return nil
-	}
-	arr := gjson.ParseBytes(b).Array()
-
-	var result []string
-	for _, v := range arr {
-		str := v.Str
-		if str != "" {
-			result = append(result, str)
-		}
-	}
-
-	return result
-}
-
-func (s *service) setString(i interface{}) string {
-	if i == nil {
-		return ""
-	}
-
-	str, ok := i.(string)
-	if !ok {
-		return ""
-	}
-
-	return str
-}
-
-func (s *service) setInt(i interface{}) int {
-	if i == nil {
-		return 0
-	}
-
-	num, ok := i.(float64)
-	if !ok {
-		return 0
-	}
-
-	return int(num)
-}
-
-func (s *service) setTime(i interface{}) *models.Timestamp {
-	if i == nil {
-		return nil
-	}
-
-	timestamp, ok := i.(float64)
-	if !ok {
-		return nil
-	}
-	t := time.Unix(int64(timestamp), 0).UTC()
-
-	return utils.Pointer(models.Timestamp(t.Unix()))
-}
-
-func (s *service) setTagMap(i interface{}) *models.TagMap {
-	if i == nil {
-		return nil
-	}
-
-	tags, ok := i.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
-	result := make(models.TagMap)
-	for k, v := range tags {
-		if len(k) > 1 && k[0] == '#' {
-			result[k] = s.setStringArray(v)
-		}
-	}
-
-	return &result
-}
-
-// filters Parse and validate filters
-func (s *service) filters(req []*json.RawMessage) (*models.Filters, error) {
-	filters := make(models.Filters, len(req)-2)
+	filters := make(models.Filters, len(req[2:]))
 	for i, filter := range req[2:] {
 		data := make(map[string]interface{})
 		err := json.Unmarshal(*filter, &data)
@@ -149,15 +49,38 @@ func (s *service) filters(req []*json.RawMessage) (*models.Filters, error) {
 			return nil, errInvalidFilter
 		}
 
+		tagMap := make(models.TagMap, 0)
 		var out models.Filter
-		out.IDs = s.setStringArray(data["ids"])
-		out.Kinds = s.setIntArray(data["kinds"])
-		out.Authors = s.setStringArray(data["authors"])
-		out.Tags = *s.setTagMap(data)
-		out.Since = s.setTime(data["since"])
-		out.Until = s.setTime(data["until"])
-		out.Limit = s.setInt(data["limit"])
-		out.Search = s.setString(data["search"])
+		for k, v := range data {
+			switch k {
+			case "ids":
+				out.IDs = generic.ConvertInterfaceToSliceString(v)
+
+			case "kinds":
+				out.Kinds = generic.ConvertInterfaceToSliceInt(v)
+
+			case "authors":
+				out.Authors = generic.ConvertInterfaceToSliceString(v)
+
+			case "since":
+				out.Since = utils.Pointer(models.Timestamp(generic.ConvertInterfaceToTime(v).Unix()))
+
+			case "until":
+				out.Until = utils.Pointer(models.Timestamp(generic.ConvertInterfaceToTime(v).Unix()))
+
+			case "limit":
+				out.Limit = generic.ConvertInterfaceToInt(v)
+
+			case "search":
+				out.Search = generic.ConvertInterfaceToString(v)
+
+			default:
+				if len(k) > 1 && k[0] == '#' {
+					tagMap[k] = generic.ConvertInterfaceToSliceString(v)
+				}
+			}
+		}
+		out.Tags = tagMap
 
 		filters[i] = out
 	}
@@ -165,8 +88,8 @@ func (s *service) filters(req []*json.RawMessage) (*models.Filters, error) {
 	return &filters, nil
 }
 
-// event Parse event
-func (s *service) event(req []*json.RawMessage) (*models.Event, error) {
+// parseEvent parse event
+func (s *service) parseEvent(req []*json.RawMessage) (*models.Event, error) {
 	latestIndex := len(req) - 1
 	var evt models.Event
 	err := json.Unmarshal(*req[latestIndex], &evt)

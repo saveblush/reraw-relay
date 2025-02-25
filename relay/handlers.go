@@ -76,14 +76,6 @@ func (s *service) handleEvent(msg []byte) error {
 
 	json.Unmarshal(*req[0], &cmd)
 
-	logger.Log.Info("cmd ", cmd)
-	logger.Log.Info("msg: ", string(msg))
-
-	//
-	//var message []interface{}
-	//_ = json.Unmarshal(msg, &message)
-	//
-
 	switch cmd {
 	case "EVENT":
 		err := s.onEvent(req)
@@ -122,7 +114,7 @@ func (s *service) handleEvent(msg []byte) error {
 }
 
 func (s *service) onEvent(req []*json.RawMessage) error {
-	evt, err := s.event(req)
+	evt, err := s.parseEvent(req)
 	if err != nil {
 		return err
 	}
@@ -190,37 +182,15 @@ func (s *service) onEvent(req []*json.RawMessage) error {
 }
 
 func (s *service) onReq(req []*json.RawMessage) error {
-	if len(req) < 3 {
-		return errInvalidReq
-	}
-
 	subID, err := s.subID(req)
 	if err != nil {
 		return err
 	}
 
-	filters, err := s.filters(req)
+	filters, err := s.parseFilters(req)
 	if err != nil {
 		return err
 	}
-	fmt.Println(filters)
-
-	//
-	/*filters1 := make([]models.Filter, len(req)-2)
-	for i, filter := range req[2:] {
-		filterData, ok := filter.(map[string]interface{})
-		if !ok {
-			fmt.Println("Invalid filter format")
-		}
-		fmt.Println(filterData)
-		var f models.Filter
-		f.IDs = ToStringArray(filterData["ids"])
-		f.Kinds = ToIntArray(filterData["kinds"])
-		f.Tags = ToTagsMap(filterData)
-		fmt.Println("f: ", f.Tags)
-		filters1[i] = f
-	}*/
-	//
 
 	for idx, filter := range *filters {
 		// check reject
@@ -269,7 +239,7 @@ func (s *service) onCount(req []*json.RawMessage) error {
 		return err
 	}
 
-	filters, err := s.filters(req)
+	filters, err := s.parseFilters(req)
 	if err != nil {
 		return err
 	}

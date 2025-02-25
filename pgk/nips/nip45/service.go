@@ -7,11 +7,6 @@ import (
 	"github.com/saveblush/reraw-relay/pgk/eventstore"
 )
 
-type ResCountEvent struct {
-	Count *int64 `json:"count"`
-	Err   error  `json:"err"`
-}
-
 // Service service interface
 type Service interface {
 	CountEvent(c *cctx.Context, req *models.Filter) (*int64, error)
