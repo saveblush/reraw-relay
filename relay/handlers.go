@@ -79,6 +79,11 @@ func (s *service) handleEvent(msg []byte) error {
 	logger.Log.Info("cmd ", cmd)
 	logger.Log.Info("msg: ", string(msg))
 
+	//
+	//var message []interface{}
+	//_ = json.Unmarshal(msg, &message)
+	//
+
 	switch cmd {
 	case "EVENT":
 		err := s.onEvent(req)
@@ -198,6 +203,24 @@ func (s *service) onReq(req []*json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println(filters)
+
+	//
+	/*filters1 := make([]models.Filter, len(req)-2)
+	for i, filter := range req[2:] {
+		filterData, ok := filter.(map[string]interface{})
+		if !ok {
+			fmt.Println("Invalid filter format")
+		}
+		fmt.Println(filterData)
+		var f models.Filter
+		f.IDs = ToStringArray(filterData["ids"])
+		f.Kinds = ToIntArray(filterData["kinds"])
+		f.Tags = ToTagsMap(filterData)
+		fmt.Println("f: ", f.Tags)
+		filters1[i] = f
+	}*/
+	//
 
 	for idx, filter := range *filters {
 		// check reject

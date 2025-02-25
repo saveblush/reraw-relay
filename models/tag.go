@@ -7,8 +7,6 @@ import (
 	"github.com/goccy/go-json"
 )
 
-type TagMap map[string][]string
-
 type Tag []string
 
 func (t *Tag) CheckKey(prefix string) bool {
