@@ -102,12 +102,16 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	var sqlLimit string
 	if req.NostrFilter.Limit > 0 {
 		limit = req.NostrFilter.Limit
-	} else if !generic.IsEmpty(config.CF.Info.Limitation.MaxLimit) {
+	} else if config.CF.Info.Limitation.MaxLimit > 0 {
 		if !req.DoCount {
 			limit = config.CF.Info.Limitation.MaxLimit
-			if generic.IsEmpty(req.NostrFilter.Since) {
-				limit = 10 // กรณีไม่กำหนดช่วงในการหาเหตุการณ์
-			}
+		}
+	} else {
+		// กรณีไม่กำหนดช่วงในการหาเหตุการณ์
+		if generic.IsEmpty(req.NostrFilter.Since) {
+			limit = 50
+		} else {
+			req.NoLimit = true
 		}
 	}
 
@@ -128,9 +132,9 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	}
 
 	sql := `SELECT ` + sqlField + `
-	FROM ` + models.Event{}.TableName() + ` 
-	WHERE ` + strings.Join(conditions, " AND ") + `
-	` + sqlOrderBy + ` ` + sqlLimit
+			FROM ` + models.Event{}.TableName() + ` 
+			WHERE ` + strings.Join(conditions, " AND ") + `
+			` + sqlOrderBy + ` ` + sqlLimit
 
 	return sql, params, nil
 }

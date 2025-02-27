@@ -6,7 +6,7 @@ import (
 	"github.com/saveblush/reraw-relay/core/sql"
 )
 
-// GetRelayDatabase get connection database `ralay`
-func (c *Context) GetRelayDatabase() *gorm.DB {
-	return sql.RelayDatabase
+// GetDatabase get connection database `ralay`
+func (c *Context) GetDatabase() *gorm.DB {
+	return sql.Database
 }

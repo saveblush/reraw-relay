@@ -47,15 +47,15 @@ func main() {
 	}
 
 	// Set to global variable database
-	sql.RelayDatabase = session.Database
+	sql.Database = session.Database
 
 	// Debug db
 	if !config.CF.App.Environment.Production() {
-		sql.DebugRelayDatabase()
+		sql.DebugDatabase()
 	}
 
 	// Migration db
-	_ = sql.Migration(sql.RelayDatabase)
+	_ = sql.Migration(sql.Database)
 
 	// Cron
 	cron := cron.NewService()
@@ -71,7 +71,7 @@ func main() {
 		Addr:    *addr,
 		Handler: handler,
 	}
-	server.SetKeepAlivesEnabled(false)
+	server.SetKeepAlivesEnabled(true)
 
 	go func() {
 		err = server.ListenAndServe()
@@ -95,7 +95,7 @@ func main() {
 	logger.Log.Info("Cron closed")
 
 	// Close db
-	go sql.CloseConnection(sql.RelayDatabase)
+	go sql.CloseConnection(sql.Database)
 	logger.Log.Info("Database connection closed")
 
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 5*time.Second)
