@@ -3,6 +3,7 @@ package models
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/goccy/go-json"
 )
@@ -41,7 +42,7 @@ type Tags []Tag
 func (t *Tags) Scan(v interface{}) error {
 	bytes, ok := v.([]byte)
 	if !ok {
-		return errors.New(fmt.Sprint("Failed to unmarshal JSONB value:", v))
+		return errors.New(fmt.Sprint("failed to unmarshal Jsonb value:", v))
 	}
 	err := json.Unmarshal(bytes, &t)
 
@@ -58,9 +59,9 @@ func (t *Tags) FindKeyD() string {
 	return ""
 }
 
-func (t *Tags) FindFirst(tagPrefix string) *Tag {
+func (t *Tags) FindFirst(prefix string) *Tag {
 	for _, v := range *t {
-		if v.CheckKey(tagPrefix) {
+		if v.CheckKey(prefix) {
 			return &v
 		}
 	}
@@ -68,13 +69,23 @@ func (t *Tags) FindFirst(tagPrefix string) *Tag {
 	return nil
 }
 
-func (t *Tags) FindAll(tagPrefix string) *Tags {
+func (t *Tags) FindAll(prefix string) *Tags {
 	result := make(Tags, 0, len(*t))
 	for _, v := range *t {
-		if v.CheckKey(tagPrefix) {
+		if v.CheckKey(prefix) {
 			result = append(result, v)
 		}
 	}
 
 	return &result
+}
+
+func (t *Tags) Serialize() string {
+	var strTags []string
+	for _, tag := range *t {
+		str := fmt.Sprintf(`["%s"]`, strings.Join(tag, `","`))
+		strTags = append(strTags, str)
+	}
+
+	return "[" + strings.Join(strTags, ",") + "]"
 }

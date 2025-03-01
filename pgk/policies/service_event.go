@@ -10,18 +10,19 @@ import (
 	"github.com/saveblush/reraw-relay/models"
 )
 
-// RejectValidateEvent reject validate event
+// RejectValidateEvent reject validate event data
 func (s *service) RejectValidateEvent(c *cctx.Context, evt *models.Event) (bool, string) {
-	/*if evt.GetID() != evt.ID {
-		return true, nostr.NormalizeOKMessage("event id is computed incorrectly", "invalid")
+	if evt.GetID() != evt.ID {
+		return true, fmt.Sprintf("invalid: %s", "event id is computed incorrectly")
 	}
 
-	ok, err := evt.CheckSignature()
+	ok, err := evt.VerifySignature()
 	if err != nil {
-		return true, nostr.NormalizeOKMessage("failed to verify signature", "error")
-	} else if !ok {
-		return true, nostr.NormalizeOKMessage("signature is invalid", "invalid")
-	}*/
+		return true, fmt.Sprintf("error: %s", "failed to verify signature")
+	}
+	if !ok {
+		return true, fmt.Sprintf("invalid: %s", "signature is invalid")
+	}
 
 	return false, ""
 }
