@@ -17,6 +17,8 @@ const (
 type Event struct {
 	ID         string     `json:"id" gorm:"primaryKey;type:varchar(64)"`
 	CreatedAt  Timestamp  `json:"created_at" gorm:"type:integer"`
+	UpdatedAt  *Timestamp `json:"-" gorm:"type:integer"`
+	DeletedAt  *Timestamp `json:"-" gorm:"type:integer"`
 	Pubkey     string     `json:"pubkey" gorm:"type:varchar(64)"`
 	Kind       int        `json:"kind" gorm:"type:integer"`
 	Content    string     `json:"content"`
@@ -24,9 +26,6 @@ type Event struct {
 	Sig        string     `json:"sig"`
 	Tagvalues  []string   `json:"-" gorm:"-"`
 	Expiration *Timestamp `json:"-" gorm:"type:integer"`
-	UpdatedIP  *string    `json:"-"`
-	UpdatedAt  *Timestamp `json:"-" gorm:"type:integer"`
-	DeletedAt  *Timestamp `json:"-" gorm:"type:integer"`
 }
 
 func (Event) TableName() string {

@@ -47,11 +47,12 @@ func createDatabase(cf *Configuration) error {
 func Migration(db *gorm.DB) error {
 	var sqls []string
 	sqls = append(sqls, `
-		CREATE OR REPLACE FUNCTION tags_to_tagvalues(jsonb) RETURNS text[]
-			AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(t->>0) = 1;'
+		CREATE OR REPLACE FUNCTION json_value_to_array(jsonb)
+			RETURNS text[]
 			LANGUAGE SQL
 			IMMUTABLE
-			RETURNS NULL ON NULL INPUT;
+		AS 'SELECT array_agg(t->>1) FROM (SELECT jsonb_array_elements($1) AS t)s WHERE length(t->>0) = 1;'
+		RETURNS NULL ON NULL INPUT;
 	`)
 
 	sqls = append(sqls, `
@@ -65,22 +66,19 @@ func Migration(db *gorm.DB) error {
 			tags jsonb DEFAULT NULL,
 			content text DEFAULT NULL,
 			sig text DEFAULT NULL,
-			tagvalues text[] GENERATED ALWAYS AS (tags_to_tagvalues(tags)) STORED
+			tagvalues text[] GENERATED ALWAYS AS (json_value_to_array(tags)) STORED,
+			expiration integer DEFAULT NULL
  		);
 	`)
 
-	// alter
-	sqls = append(sqls, `ALTER TABLE events ADD IF NOT EXISTS expiration integer`)
-	sqls = append(sqls, `ALTER TABLE events ADD IF NOT EXISTS updated_ip text`)
-
 	// index events
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_id ON events (id);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_pubkey ON events (pubkey);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_created_at ON events (created_at);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_deleted_at ON events (deleted_at);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_kind ON events (kind);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_tagvalues ON events USING gin (tagvalues);`)
-	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_expiration ON events (expiration);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_id ON events (id);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_pubkey ON events (pubkey);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_created_at ON events (created_at DESC);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_deleted_at ON events (deleted_at);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_kind ON events (kind);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_tagvalues ON events USING gin (tagvalues);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_expiration ON events (expiration);`)
 
 	for _, sql := range sqls {
 		err := db.Exec(sql).Error

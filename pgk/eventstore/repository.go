@@ -203,15 +203,14 @@ func (r *repository) Insert(db *gorm.DB, req *models.Event) error {
 	data := map[string]interface{}{
 		"id":         req.ID,
 		"created_at": req.CreatedAt,
+		"updated_at": req.UpdatedAt,
+		"deleted_at": req.DeletedAt,
 		"pubkey":     req.Pubkey,
 		"Kind":       req.Kind,
 		"content":    req.Content,
 		"tags":       tags,
 		"sig":        req.Sig,
 		"expiration": req.Expiration,
-		"updated_ip": req.UpdatedIP,
-		"updated_at": req.UpdatedAt,
-		"deleted_at": req.DeletedAt,
 	}
 	err := db.Model(&models.Event{}).Create(&data).Error
 	if err != nil {

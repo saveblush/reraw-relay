@@ -143,8 +143,8 @@ func (s *service) onEvent(req []*json.RawMessage) error {
 		return errConnectDatabase
 	}
 	if !generic.IsEmpty(fetch) {
-		_ = s.responseOK(evt.ID, true, errDuplicate.Error())
-		return errDuplicate
+		_ = s.responseOK(evt.ID, true, errDuplicateEvent.Error())
+		return errDuplicateEvent
 	}
 
 	// store event
@@ -324,7 +324,6 @@ func (s *service) storeEvent(evt *models.Event) error {
 		Content:   evt.Content,
 		Tags:      evt.Tags,
 		Sig:       evt.Sig,
-		UpdatedIP: utils.Pointer(s.Conn.IP()),
 	}
 
 	// get expiration

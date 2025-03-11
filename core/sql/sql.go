@@ -1,11 +1,14 @@
 package sql
 
 import (
-	"database/sql"
+	"fmt"
 	"time"
 
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/saveblush/reraw-relay/core/utils"
 )
 
 var (
@@ -23,13 +26,13 @@ var (
 var defaultConfig = &gorm.Config{
 	PrepareStmt:            true,
 	SkipDefaultTransaction: true,
+	DisableAutomaticPing:   true,
 	Logger:                 logger.Default.LogMode(logger.Error),
 }
 
 // Session session
 type Session struct {
 	Database *gorm.DB
-	Conn     *sql.DB
 }
 
 // Configuration config mysql
@@ -56,7 +59,18 @@ func InitConnection(cf *Configuration) (*Session, error) {
 	}
 
 	// connect db postgres
-	db, err = openPostgres(cf)
+	dsn := fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s TimeZone=%s sslmode=disable",
+		cf.Username,
+		cf.Password,
+		cf.Host,
+		cf.Port,
+		cf.DatabaseName,
+		utils.TimeZone(),
+	)
+	db, err = gorm.Open(postgres.New(postgres.Config{
+		DSN:                 dsn,
+		WithoutQuotingCheck: true,
+	}), defaultConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +101,7 @@ func InitConnection(cf *Configuration) (*Session, error) {
 		return nil, err
 	}
 
-	return &Session{Database: db, Conn: sqlDB}, nil
+	return &Session{Database: db}, nil
 }
 
 // CloseConnection close connection db
