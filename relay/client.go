@@ -86,7 +86,7 @@ func (client *Client) writer() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
-		client.conn.Close()
+		//client.conn.Close()
 	}()
 
 	for {
