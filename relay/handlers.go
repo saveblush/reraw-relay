@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -23,10 +22,10 @@ import (
 )
 
 type service struct {
-	config    *config.Configs
-	cctx      *cctx.Context
-	ctx       context.Context
-	respMutex sync.Mutex
+	config *config.Configs
+	cctx   *cctx.Context
+	ctx    context.Context
+	//respMutex sync.Mutex
 
 	eventstore eventstore.Service
 	nip09      nip09.Service
@@ -34,7 +33,8 @@ type service struct {
 	nip40      nip40.Service
 	nip45      nip45.Service
 
-	Conn         *Conn
+	client *Client
+
 	StoreEvent   StoreEvent
 	RejectFilter RejectFilter
 	RejectEvent  RejectEvent

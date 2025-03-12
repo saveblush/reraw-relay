@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,7 +21,20 @@ import (
 )
 
 const (
-	pongWait = 120 * time.Second
+	writeWait  = 10 * time.Second
+	pongWait   = 120 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+)
+
+var (
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true,
+		CheckOrigin: func(r *http.Request) bool {
+			return true
+		},
+	}
 )
 
 var (
@@ -43,64 +55,88 @@ type RejectFilter []func(filter *models.Filter) (reject bool, msg string)
 type RejectEvent []func(cctx *cctx.Context, evt *models.Event) (reject bool, msg string)
 
 type Relay struct {
-	serveMux *http.ServeMux
-	ctx      context.Context
-	upgrader websocket.Upgrader
-	policies policies.Service
+	mu sync.Mutex
 
-	ServiceURL string
-	Info       *models.RelayInformationDocument
+	policies     policies.Service
+	storeEvent   StoreEvent
+	rejectFilter RejectFilter
+	rejectEvent  RejectEvent
 
+	ServiceURL         string
+	Info               *models.RelayInformationDocument
 	HandshakeTimeout   time.Duration
 	MessageLengthLimit int64
 
-	clientsMutex sync.Mutex
-	clients      map[*websocket.Conn]struct{}
+	clients    map[*Client]bool
+	register   chan *Client
+	unregister chan *Client
 }
 
 // NewRelay new relay
 func NewRelay() *Relay {
-	nip11 := &models.RelayInformationDocument{}
-	copier.Copy(nip11, &config.CF.Info)
-
 	rl := &Relay{
-		serveMux: &http.ServeMux{},
-		ctx:      context.TODO(),
-		upgrader: websocket.Upgrader{
-			ReadBufferSize:    1024,
-			WriteBufferSize:   1024,
-			EnableCompression: true,
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		},
 		policies: policies.NewService(),
 
-		Info:               nip11,
 		HandshakeTimeout:   180 * time.Second,
-		MessageLengthLimit: 1024 * 1024 * 0.5,
+		MessageLengthLimit: 0.5 * 1024 * 1024,
 
-		clients: make(map[*websocket.Conn]struct{}),
+		clients:    make(map[*Client]bool),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
 	}
+
+	// info relay
+	nip11 := &models.RelayInformationDocument{}
+	copier.Copy(nip11, &config.CF.Info)
+	rl.Info = nip11
+
+	// policies event nostr
+	rl.storeEvent = append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
+	rl.rejectFilter = append(RejectFilter{}, rl.policies.RejectEmptyFilters)
+	rl.rejectEvent = append(RejectEvent{},
+		rl.policies.RejectValidateEvent,
+		rl.policies.RejectValidatePow,
+		rl.policies.RejectValidateTimeStamp,
+		rl.policies.RejectEventWithCharacter,
+		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
 	return rl
 }
 
 func (rl *Relay) Serve() *http.ServeMux {
-	mux := rl.serveMux
+	go rl.run()
+
+	mux := &http.ServeMux{}
 	mux.HandleFunc("/", rl.handleRequest)
 
 	return mux
 }
 
+func (rl *Relay) run() {
+	for {
+		select {
+		case client := <-rl.register:
+			rl.clients[client] = true
+			logger.Log.Infof("[connected] %s", client.IP())
+
+		case client := <-rl.unregister:
+			if _, ok := rl.clients[client]; ok {
+				delete(rl.clients, client)
+				close(client.send)
+				logger.Log.Infof("[disconnect] %s", client.IP())
+			}
+		}
+	}
+}
+
 // CloseRelay close relay
 func (rl *Relay) CloseRelay() error {
-	rl.clientsMutex.Lock()
-	defer rl.clientsMutex.Unlock()
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
 
 	for c := range rl.clients {
-		c.WriteControl(websocket.CloseMessage, nil, time.Now().Add(time.Second))
-		c.Close()
+		c.conn.WriteControl(websocket.CloseMessage, nil, time.Now().Add(time.Second))
+		c.conn.Close()
 	}
 	clear(rl.clients)
 
@@ -135,110 +171,31 @@ func (rl *Relay) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 // handleWebsocket handle websocket
 func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
-	// policies event nostr
-	storeEvent := append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
-	rejectFilter := append(RejectFilter{}, rl.policies.RejectEmptyFilters)
-	rejectEvent := append(RejectEvent{},
-		rl.policies.RejectValidateEvent,
-		rl.policies.RejectValidatePow,
-		rl.policies.RejectValidateTimeStamp,
-		rl.policies.RejectEventWithCharacter,
-		rl.policies.RejectEventFromPubkeyWithBlacklist)
-
-	// ip
-	ip := rl.ip(r)
-
 	// ws
-	up := rl.upgrader
+	up := upgrader
 	up.HandshakeTimeout = rl.HandshakeTimeout
-	ws, err := up.Upgrade(w, r, nil)
+	conn, err := up.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {
-			logger.Log.Error("ws upgrade error: %s", err)
+			logger.Log.Error("websocket upgrade error: %s", err)
 		}
 		return
 	}
-	defer func() {
-		rl.clientsMutex.Lock()
-		if _, ok := rl.clients[ws]; ok {
-			ws.Close()
-			delete(rl.clients, ws)
-		}
-		rl.clientsMutex.Unlock()
-		logger.Log.Infof("[disconnect] %s", ip)
-	}()
 
-	// config ws
-	if config.CF.Info.Limitation.MaxMessageLength > 0 {
-		rl.MessageLengthLimit = int64(config.CF.Info.Limitation.MaxMessageLength)
+	// client
+	client := &Client{
+		relay: rl,
+		conn:  conn,
+		send:  make(chan interface{}),
+		ip:    ip(r),
 	}
-	ws.SetReadLimit(rl.MessageLengthLimit)
-	ws.SetCompressionLevel(9)
-	ws.SetReadDeadline(time.Now().Add(pongWait))
-	ws.SetPongHandler(func(string) error { ws.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	client.relay.register <- client
 
-	conn := &Conn{
-		Conn: ws,
-		ip:   ip,
-	}
-	logger.Log.Infof("[connected] %s", ip)
+	// goroutine to handle outgoing messages
+	go client.writer()
 
-	// clients ws
-	rl.clientsMutex.Lock()
-	rl.clients[ws] = struct{}{}
-	rl.clientsMutex.Unlock()
-
-	// handle event nostr
-	rt := newHandleEvent()
-	rt.Conn = conn
-	rt.StoreEvent = storeEvent
-	rt.RejectFilter = rejectFilter
-	rt.RejectEvent = rejectEvent
-
-	for {
-		mt, msg, err := conn.ReadMessage()
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(
-				err,
-				websocket.CloseNormalClosure,
-				websocket.CloseAbnormalClosure,
-				websocket.CloseNoStatusReceived,
-				websocket.CloseGoingAway,
-			) {
-				logger.Log.Warnf("unexpected close error from %s: %s", conn.IP(), err)
-			}
-			break
-		}
-
-		if mt != websocket.TextMessage {
-			logger.Log.Error("message is not UTF-8. %s disconnecting...", conn.IP())
-			break
-		}
-
-		if mt == websocket.PingMessage {
-			conn.WriteMessage(websocket.PongMessage, nil)
-			continue
-		}
-
-		go func(msg []byte) {
-			err = rt.handleEvent(msg)
-			if err != nil {
-				logger.Log.Errorf("handle event error: %s", err)
-				return
-			}
-		}(msg)
-	}
-}
-
-// ip get the client's ip address
-func (rl *Relay) ip(r *http.Request) string {
-	xff := r.Header.Get("X-Forwarded-For")
-	ip := strings.Split(xff, ",")[0]
-	if generic.IsEmpty(ip) {
-		ip = r.RemoteAddr
-	}
-
-	return ip
+	// processing incoming messages
+	client.reader()
 }
 
 // showNIP11 show nip11 info
@@ -274,12 +231,13 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 	fmt.Fprint(w, strings.Join(str, "\n"))
 }
 
-type Conn struct {
-	*websocket.Conn
-	ip string
-}
+// ip get the client's ip address
+func ip(r *http.Request) string {
+	xff := r.Header.Get("X-Forwarded-For")
+	ip := strings.Split(xff, ",")[0]
+	if generic.IsEmpty(ip) {
+		ip = r.RemoteAddr
+	}
 
-// IP returns the client's ip address
-func (conn *Conn) IP() string {
-	return conn.ip
+	return ip
 }
