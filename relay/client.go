@@ -71,13 +71,13 @@ func (client *Client) reader() {
 			continue
 		}
 
-		go func(msg []byte) {
-			err = rt.handleEvent(msg)
-			if err != nil {
-				logger.Log.Errorf("handle event error: %s", err)
-				return
-			}
-		}(msg)
+		//go func(msg []byte) {
+		err = rt.handleEvent(msg)
+		if err != nil {
+			logger.Log.Errorf("handle event error: %s", err)
+			return
+		}
+		//}(msg)
 	}
 }
 

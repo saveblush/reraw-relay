@@ -195,7 +195,7 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	go client.writer()
 
 	// processing incoming messages
-	client.reader()
+	go client.reader()
 }
 
 // showNIP11 show nip11 info
