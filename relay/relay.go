@@ -20,12 +20,6 @@ import (
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
 
-const (
-	writeWait  = 10 * time.Second
-	pongWait   = 120 * time.Second
-	pingPeriod = (pongWait * 9) / 10
-)
-
 var (
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:    1024,
@@ -49,40 +43,45 @@ var (
 	errGetSubID             = errors.New("error: received subscription id is not a string")
 )
 
-type StoreEvent []func(cctx *cctx.Context, evt *models.Event) error
-type RejectConnection []func(r *http.Request) bool
-type RejectFilter []func(filter *models.Filter) (reject bool, msg string)
-type RejectEvent []func(cctx *cctx.Context, evt *models.Event) (reject bool, msg string)
-
 type Relay struct {
-	mu sync.Mutex
+	serveMux *http.ServeMux
+	mu       sync.Mutex
 
-	policies     policies.Service
-	storeEvent   StoreEvent
-	rejectFilter RejectFilter
-	rejectEvent  RejectEvent
-
-	ServiceURL         string
-	Info               *models.RelayInformationDocument
-	HandshakeTimeout   time.Duration
-	MessageLengthLimit int64
+	policies         policies.Service
+	rejectConnection []func(r *http.Request) bool
+	storeEvent       []func(cctx *cctx.Context, evt *models.Event) error
+	rejectFilter     []func(filter *models.Filter) (reject bool, msg string)
+	rejectEvent      []func(cctx *cctx.Context, evt *models.Event) (reject bool, msg string)
 
 	clients    map[*Client]bool
 	register   chan *Client
 	unregister chan *Client
+
+	ServiceURL string
+	Info       *models.RelayInformationDocument
+
+	HandshakeTimeout   time.Duration
+	WriteWait          time.Duration
+	PongWait           time.Duration
+	PingPeriod         time.Duration
+	MessageLengthLimit int64
 }
 
 // NewRelay new relay
 func NewRelay() *Relay {
 	rl := &Relay{
+		serveMux: &http.ServeMux{},
 		policies: policies.NewService(),
-
-		HandshakeTimeout:   180 * time.Second,
-		MessageLengthLimit: 0.5 * 1024 * 1024,
 
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+
+		HandshakeTimeout:   180 * time.Second,
+		WriteWait:          10 * time.Second,
+		PongWait:           120 * time.Second,
+		PingPeriod:         60 * time.Second,
+		MessageLengthLimit: 0.5 * 1024 * 1024,
 	}
 
 	// info relay
@@ -91,28 +90,29 @@ func NewRelay() *Relay {
 	rl.Info = nip11
 
 	// policies event nostr
-	rl.storeEvent = append(StoreEvent{}, rl.policies.StoreBlacklistWithContent)
-	rl.rejectFilter = append(RejectFilter{}, rl.policies.RejectEmptyFilters)
-	rl.rejectEvent = append(RejectEvent{},
+	rl.rejectConnection = append(rl.rejectConnection, rl.policies.RejectEmptyHeaderUserAgent)
+	rl.storeEvent = append(rl.storeEvent, rl.policies.StoreBlacklistWithContent)
+	rl.rejectFilter = append(rl.rejectFilter, rl.policies.RejectEmptyFilters)
+	rl.rejectEvent = append(rl.rejectEvent,
 		rl.policies.RejectValidateEvent,
 		rl.policies.RejectValidatePow,
 		rl.policies.RejectValidateTimeStamp,
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
+	go rl.ready()
+
 	return rl
 }
 
 func (rl *Relay) Serve() *http.ServeMux {
-	go rl.run()
-
-	mux := &http.ServeMux{}
+	mux := rl.serveMux
 	mux.HandleFunc("/", rl.handleRequest)
 
 	return mux
 }
 
-func (rl *Relay) run() {
+func (rl *Relay) ready() {
 	for {
 		select {
 		case client := <-rl.register:
@@ -146,8 +146,7 @@ func (rl *Relay) CloseRelay() error {
 // handleRequest handle request
 func (rl *Relay) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// check reject
-	rejectConnection := append(RejectConnection{}, rl.policies.RejectEmptyHeaderUserAgent)
-	for _, rejectFunc := range rejectConnection {
+	for _, rejectFunc := range rl.rejectConnection {
 		if rejectFunc(r) {
 			return
 		}
@@ -186,7 +185,7 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		relay: rl,
 		conn:  conn,
-		send:  make(chan interface{}),
+		send:  make(chan []byte),
 		ip:    ip(r),
 	}
 	client.relay.register <- client

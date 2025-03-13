@@ -1,7 +1,6 @@
 package relay
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -22,30 +21,25 @@ import (
 )
 
 type service struct {
-	config *config.Configs
-	cctx   *cctx.Context
-	ctx    context.Context
-	//respMutex sync.Mutex
-
-	eventstore eventstore.Service
-	nip09      nip09.Service
-	nip13      nip13.Service
-	nip40      nip40.Service
-	nip45      nip45.Service
-
 	client *Client
 
-	StoreEvent   StoreEvent
-	RejectFilter RejectFilter
-	RejectEvent  RejectEvent
+	config *config.Configs
+	cctx   *cctx.Context
+
+	eventstore eventstore.Service
+
+	nip09 nip09.Service
+	nip13 nip13.Service
+	nip40 nip40.Service
+	nip45 nip45.Service
 }
 
 // newHandleEvent new handle event
 func newHandleEvent() *service {
 	return &service{
+		client:     &Client{},
 		config:     config.CF,
 		cctx:       &cctx.Context{},
-		ctx:        context.TODO(),
 		eventstore: eventstore.NewService(),
 		nip09:      nip09.NewService(),
 		nip13:      nip13.NewService(),
@@ -118,7 +112,7 @@ func (s *service) onEvent(req []*json.RawMessage) error {
 	}
 
 	// check reject
-	for _, rejectFunc := range s.RejectEvent {
+	for _, rejectFunc := range s.client.relay.rejectEvent {
 		if reject, msg := rejectFunc(s.cctx, evt); reject {
 			_ = s.responseOK(evt.ID, false, msg)
 			return errors.New(msg)
@@ -146,7 +140,7 @@ func (s *service) onEvent(req []*json.RawMessage) error {
 	}
 
 	// store event
-	for _, storeFunc := range s.StoreEvent {
+	for _, storeFunc := range s.client.relay.storeEvent {
 		err := storeFunc(s.cctx, evt)
 		if err != nil {
 			logger.Log.Errorf("func store event error: %s", err)
@@ -192,7 +186,7 @@ func (s *service) onReq(req []*json.RawMessage) error {
 
 	for idx, filter := range *filters {
 		// check reject
-		for _, rejectFunc := range s.RejectFilter {
+		for _, rejectFunc := range s.client.relay.rejectFilter {
 			if reject, msg := rejectFunc(&filter); reject {
 				_ = s.responseClosed(subID, msg)
 				return errors.New(msg)

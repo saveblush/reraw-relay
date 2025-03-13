@@ -3,6 +3,7 @@ package relay
 import (
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 
 	"github.com/saveblush/reraw-relay/core/config"
@@ -14,7 +15,7 @@ type Client struct {
 
 	conn *websocket.Conn
 
-	send chan interface{}
+	send chan []byte
 
 	ip string
 }
@@ -37,14 +38,11 @@ func (client *Client) reader() {
 	}
 	client.conn.SetReadLimit(client.relay.MessageLengthLimit)
 	client.conn.SetCompressionLevel(9)
-	client.conn.SetReadDeadline(time.Now().Add(pongWait))
-	client.conn.SetPongHandler(func(string) error { client.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	client.conn.SetReadDeadline(time.Now().Add(client.relay.PongWait))
+	client.conn.SetPongHandler(func(string) error { client.conn.SetReadDeadline(time.Now().Add(client.relay.PongWait)); return nil })
 
 	rt := newHandleEvent()
 	rt.client = client
-	rt.StoreEvent = client.relay.storeEvent
-	rt.RejectFilter = client.relay.rejectFilter
-	rt.RejectEvent = client.relay.rejectEvent
 
 	for {
 		mt, msg, err := client.conn.ReadMessage()
@@ -83,44 +81,42 @@ func (client *Client) reader() {
 
 // writer pumps messages from the relay to the websocket connection
 func (client *Client) writer() {
-	ticker := time.NewTicker(pingPeriod)
+	ticker := time.NewTicker(client.relay.PingPeriod)
 	defer func() {
 		ticker.Stop()
-		//client.conn.Close()
+		client.conn.Close()
 	}()
 
 	for {
 		select {
 		case msg, ok := <-client.send:
-			client.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			client.conn.SetWriteDeadline(time.Now().Add(client.relay.WriteWait))
 			if !ok {
 				client.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			err := client.conn.WriteJSON(msg)
+			err := client.conn.WriteMessage(websocket.TextMessage, msg)
 			if err != nil {
 				logger.Log.Errorf("write msg error: %s", err)
 				return
 			}
 
 		case <-ticker.C:
-			client.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			client.conn.SetWriteDeadline(time.Now().Add(client.relay.WriteWait))
 			if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
 	}
-
-	/*for msg := range client.send {
-		err := client.conn.WriteJSON(msg)
-		if err != nil {
-			logger.Log.Errorf("write msg error: %s", err)
-			return
-		}
-	}*/
 }
 
-func (client *Client) SendMessage(msg interface{}) {
-	client.send <- msg
+func (client *Client) SendMessage(msg interface{}) error {
+	b, err := json.Marshal(&msg)
+	if err != nil {
+		return err
+	}
+	client.send <- b
+
+	return nil
 }
