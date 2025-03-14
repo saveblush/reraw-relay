@@ -32,6 +32,10 @@ func (s *service) subID(req []*json.RawMessage) (string, error) {
 		return "", errGetSubID
 	}
 
+	if len(id) > 64 {
+		return "", errrInvalidESubID
+	}
+
 	return id, nil
 }
 

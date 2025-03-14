@@ -80,6 +80,17 @@ type Configs struct {
 	Database struct {
 		RelaySQL DatabaseConfig `mapstructure:"RELAY_SQL"`
 	} `mapstructure:"DATABASE"`
+
+	Blacklist struct {
+		BanWords struct {
+			Enabled bool     `mapstructure:"ENABLED"`
+			Words   []string `mapstructure:"WORDS"`
+		} `mapstructure:"BAN_WORDS"`
+		BlockWords struct {
+			Enabled bool     `mapstructure:"ENABLED"`
+			Words   []string `mapstructure:"WORDS"`
+		} `mapstructure:"BLOCK_WORDS"`
+	} `mapstructure:"BLACKLIST"`
 }
 
 // InitConfig init config

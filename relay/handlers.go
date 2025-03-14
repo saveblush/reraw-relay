@@ -163,8 +163,8 @@ func (s *service) onEvent(req []*json.RawMessage) error {
 		err = s.nip09.CancelEvent(s.cctx, evt)
 		if err != nil {
 			logger.Log.Errorf("soft delete error: %s", err)
-			_ = s.responseOK(evt.ID, false, errConnectDatabase.Error())
-			return errConnectDatabase
+			_ = s.responseOK(evt.ID, false, err.Error())
+			return err
 		}
 	}
 

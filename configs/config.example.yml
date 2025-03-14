@@ -25,3 +25,15 @@ DATABASE:
     MAX_IDLE_CONNS: 5
     MAX_OPEN_CONNS: 8
     MAX_LIFE_TIME: 5m
+
+BLACKLIST:
+  BAN_WORDS:
+    ENABLED: true
+    WORDS:
+      - ReplyGuy
+      - ReplyGirl
+
+  BLOCK_WORDS:
+    ENABLED: false
+    WORDS:
+      - bot    

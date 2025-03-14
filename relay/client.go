@@ -1,6 +1,8 @@
 package relay
 
 import (
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -11,28 +13,36 @@ import (
 )
 
 type Client struct {
-	relay *Relay
+	relay     *Relay
+	conn      *websocket.Conn
+	send      chan []byte
+	respMutex sync.Mutex
 
-	conn *websocket.Conn
-
-	send chan []byte
-
-	ip string
+	ip          string
+	userAgent   string
+	connectedAt time.Time
 }
 
-// IP get client's ip
 func (client *Client) IP() string {
 	return client.ip
 }
 
-// reader pumps messages from the websocket connection to the relay
+func (client *Client) UserAgent() string {
+	return client.userAgent
+}
+
+func (client *Client) Info() string {
+	return fmt.Sprintf("IP: %s, Connected At: %s", client.ip, client.connectedAt.Format(time.RFC3339))
+}
+
+// reader อ่านข้อความจาก client
 func (client *Client) reader() {
 	defer func() {
 		client.relay.unregister <- client
 		client.conn.Close()
 	}()
 
-	// config conn
+	// config การเชื่อมต่อ websocket
 	if config.CF.Info.Limitation.MaxMessageLength > 0 {
 		client.relay.MessageLengthLimit = int64(config.CF.Info.Limitation.MaxMessageLength)
 	}
@@ -79,7 +89,7 @@ func (client *Client) reader() {
 	}
 }
 
-// writer pumps messages from the relay to the websocket connection
+// writer ส่งข้อความจาก relay ไปยัง client
 func (client *Client) writer() {
 	ticker := time.NewTicker(client.relay.PingPeriod)
 	defer func() {
@@ -111,7 +121,11 @@ func (client *Client) writer() {
 	}
 }
 
+// SendMessage ข้อความจาก relay เตรียมส่งไปยัง client
 func (client *Client) SendMessage(msg interface{}) error {
+	client.respMutex.Lock()
+	defer client.respMutex.Unlock()
+
 	b, err := json.Marshal(&msg)
 	if err != nil {
 		return err

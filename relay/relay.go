@@ -14,7 +14,7 @@ import (
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
-	"github.com/saveblush/reraw-relay/core/generic"
+	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/policies"
@@ -40,7 +40,8 @@ var (
 	errDuplicateEvent       = errors.New("duplicate: already have this event")
 	errUnknownCommand       = errors.New("error: unknown command")
 	errSubIDNotFound        = errors.New("error: subscription id not found")
-	errGetSubID             = errors.New("error: received subscription id is not a string")
+	errGetSubID             = errors.New("error: received subscription ID is not a string")
+	errrInvalidESubID       = errors.New("invalid: subscription ID must be between 1 and 64 characters")
 )
 
 type Relay struct {
@@ -123,7 +124,7 @@ func (rl *Relay) ready() {
 			if _, ok := rl.clients[client]; ok {
 				delete(rl.clients, client)
 				close(client.send)
-				logger.Log.Infof("[disconnect] %s", client.IP())
+				logger.Log.Infof("[disconnect] %s", client.Info())
 			}
 		}
 	}
@@ -148,6 +149,7 @@ func (rl *Relay) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// check reject
 	for _, rejectFunc := range rl.rejectConnection {
 		if rejectFunc(r) {
+			http.Error(w, "Invalid Upgrade Header", http.StatusBadRequest)
 			return
 		}
 	}
@@ -183,17 +185,19 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 
 	// client
 	client := &Client{
-		relay: rl,
-		conn:  conn,
-		send:  make(chan []byte),
-		ip:    ip(r),
+		relay:       rl,
+		conn:        conn,
+		send:        make(chan []byte),
+		ip:          utils.GetIP(r),
+		userAgent:   utils.GetUserAgent(r),
+		connectedAt: utils.Now(),
 	}
 	client.relay.register <- client
 
-	// goroutine to handle outgoing messages
+	// เตรียมส่งข้อความกลับ
 	go client.writer()
 
-	// processing incoming messages
+	// อ่านข้อความ
 	client.reader()
 }
 
@@ -228,15 +232,4 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 	str = append(str, fmt.Sprintf("Version: %s", rl.Info.Version))
 
 	fmt.Fprint(w, strings.Join(str, "\n"))
-}
-
-// ip get the client's ip address
-func ip(r *http.Request) string {
-	xff := r.Header.Get("X-Forwarded-For")
-	ip := strings.Split(xff, ",")[0]
-	if generic.IsEmpty(ip) {
-		ip = r.RemoteAddr
-	}
-
-	return ip
 }

@@ -48,14 +48,12 @@ func (s *service) RejectValidateTimeStamp(c *cctx.Context, evt *models.Event) (b
 
 // RejectEventWithCharacter reject event with character
 func (s *service) RejectEventWithCharacter(c *cctx.Context, evt *models.Event) (bool, string) {
-	characters := []string{
-		//"data:image",
-		//"data:video",
-	}
-
-	for _, character := range characters {
-		if strings.Contains(evt.Content, character) {
-			return true, fmt.Sprintf("blocked: event with %s", character)
+	if s.config.Blacklist.BlockWords.Enabled {
+		characters := s.config.Blacklist.BlockWords.Words
+		for _, character := range characters {
+			if strings.Contains(evt.Content, character) {
+				return true, fmt.Sprintf("blocked: event with %s", character)
+			}
 		}
 	}
 
@@ -79,17 +77,15 @@ func (s *service) RejectEventFromPubkeyWithBlacklist(c *cctx.Context, evt *model
 
 // StoreBlacklistWithContent store blacklist with content
 func (s *service) StoreBlacklistWithContent(c *cctx.Context, evt *models.Event) error {
-	characters := []string{
-		"ReplyGuy",
-		"ReplyGirl",
-	}
-
-	for _, character := range characters {
-		if strings.Contains(evt.Content, character) {
-			err := s.eventstore.InsertBlacklist(c, &models.Blacklist{Pubkey: evt.Pubkey})
-			if err != nil {
-				logger.Log.Errorf("keep bot error: %s", err)
-				return err
+	if s.config.Blacklist.BanWords.Enabled {
+		characters := s.config.Blacklist.BanWords.Words
+		for _, character := range characters {
+			if strings.Contains(evt.Content, character) {
+				err := s.eventstore.InsertBlacklist(c, &models.Blacklist{Pubkey: evt.Pubkey})
+				if err != nil {
+					logger.Log.Errorf("keep ban words error: %s", err)
+					return err
+				}
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/generic"
+	"github.com/saveblush/reraw-relay/core/utils"
 	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/eventstore"
 	"github.com/saveblush/reraw-relay/pgk/nips/nip13"
@@ -40,7 +41,7 @@ func NewService() Service {
 
 // RejectEmptyHeaderUserAgent reject empty header user-agent
 func (s *service) RejectEmptyHeaderUserAgent(r *http.Request) bool {
-	return generic.IsEmpty(r.Header.Get("User-Agent"))
+	return utils.GetUserAgent(r) == ""
 }
 
 // RejectEmptyFilters reject empty filters
