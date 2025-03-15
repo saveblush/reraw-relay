@@ -91,7 +91,15 @@ func (client *Client) reader() {
 
 // writer ส่งข้อความจาก relay ไปยัง client
 func (client *Client) writer() {
-	ticker := time.NewTicker(client.relay.PingPeriod)
+	for msg := range client.send {
+		err := client.conn.WriteMessage(websocket.TextMessage, msg)
+		if err != nil {
+			logger.Log.Errorf("write msg error: %s", err)
+			return
+		}
+	}
+
+	/*ticker := time.NewTicker(client.relay.PingPeriod)
 	defer func() {
 		ticker.Stop()
 		client.conn.Close()
@@ -118,7 +126,7 @@ func (client *Client) writer() {
 				return
 			}
 		}
-	}
+	}*/
 }
 
 // SendMessage ข้อความจาก relay เตรียมส่งไปยัง client
