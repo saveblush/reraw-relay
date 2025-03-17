@@ -98,35 +98,6 @@ func (client *Client) writer() {
 			return
 		}
 	}
-
-	/*ticker := time.NewTicker(client.relay.PingPeriod)
-	defer func() {
-		ticker.Stop()
-		client.conn.Close()
-	}()
-
-	for {
-		select {
-		case msg, ok := <-client.send:
-			client.conn.SetWriteDeadline(time.Now().Add(client.relay.WriteWait))
-			if !ok {
-				client.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
-			err := client.conn.WriteMessage(websocket.TextMessage, msg)
-			if err != nil {
-				logger.Log.Errorf("write msg error: %s", err)
-				return
-			}
-
-		case <-ticker.C:
-			client.conn.SetWriteDeadline(time.Now().Add(client.relay.WriteWait))
-			if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}*/
 }
 
 // SendMessage ข้อความจาก relay เตรียมส่งไปยัง client
