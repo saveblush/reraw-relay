@@ -1,6 +1,7 @@
 package eventstore
 
 import (
+	"context"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,7 @@ type Repository interface {
 }
 
 type repository struct {
+	ctx context.Context
 }
 
 func NewRepository() Repository {
@@ -146,7 +148,7 @@ func (r *repository) Find(db *gorm.DB, req *Request) (*models.Event, error) {
 	}
 
 	entities := &models.Event{}
-	err = db.Limit(1).Raw(sql, params...).Scan(entities).Error
+	err = db.WithContext(r.ctx).Limit(1).Raw(sql, params...).Scan(entities).Error
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +163,7 @@ func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*models.Event, error)
 	}
 
 	entities := []*models.Event{}
-	err = db.Raw(sql, params...).Scan(&entities).Error
+	err = db.WithContext(r.ctx).Raw(sql, params...).Scan(&entities).Error
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +173,7 @@ func (r *repository) FindAll(db *gorm.DB, req *Request) ([]*models.Event, error)
 
 func (r *repository) FindByID(db *gorm.DB, ID string) (*models.Event, error) {
 	entities := &models.Event{}
-	err := db.Limit(1).Where("id = ?", ID).Find(entities).Error
+	err := db.WithContext(r.ctx).Limit(1).Where("id = ?", ID).Find(entities).Error
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +188,7 @@ func (r *repository) Count(db *gorm.DB, req *Request) (*int64, error) {
 	}
 
 	var entities *int64
-	err = db.Raw(sql, params...).Scan(&entities).Error
+	err = db.WithContext(r.ctx).Raw(sql, params...).Scan(&entities).Error
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +266,7 @@ func (r *repository) queryFindBots(db *gorm.DB, req *models.Blacklist) *gorm.DB 
 func (r *repository) FindBlacklists(db *gorm.DB, req *models.Blacklist) ([]*models.Blacklist, error) {
 	entities := []*models.Blacklist{}
 	query := r.queryFindBots(db, req)
-	err := query.Find(&entities).Error
+	err := query.WithContext(r.ctx).Find(&entities).Error
 	if err != nil {
 		return nil, err
 	}
