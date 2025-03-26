@@ -24,9 +24,9 @@ var (
 
 // gorm config
 var defaultConfig = &gorm.Config{
-	PrepareStmt:            true,
+	PrepareStmt:            false,
 	SkipDefaultTransaction: true,
-	DisableAutomaticPing:   true,
+	DisableAutomaticPing:   false,
 	Logger:                 logger.Default.LogMode(logger.Error),
 }
 

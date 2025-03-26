@@ -71,12 +71,15 @@ func Migration(db *gorm.DB) error {
  		);
 	`)
 
+	sqls = append(sqls, `CREATE EXTENSION IF NOT EXISTS pg_trgm;`)
+
 	// index events
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_id ON events (id);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_pubkey ON events (pubkey);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_created_at ON events (created_at DESC);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_deleted_at ON events (deleted_at);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_kind ON events (kind);`)
+	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_content ON events USING gin (content gin_trgm_ops);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_tagvalues ON events USING gin (tagvalues);`)
 	sqls = append(sqls, `CREATE INDEX IF NOT EXISTS idx_events_expiration ON events (expiration);`)
 
