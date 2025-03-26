@@ -127,7 +127,7 @@ func (r *repository) query(req *Request) (string, []any, error) {
 		sqlField = "COUNT(1)"
 		sqlOrderBy = ""
 	} else {
-		sqlField = "*"
+		sqlField = "id, created_at, pubkey, kind, content, tags, sig"
 		sqlOrderBy = "ORDER BY created_at DESC, id"
 	}
 

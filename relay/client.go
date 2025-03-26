@@ -2,10 +2,8 @@ package relay
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
-	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 
 	"github.com/saveblush/reraw-relay/core/config"
@@ -13,10 +11,10 @@ import (
 )
 
 type Client struct {
-	relay     *Relay
-	conn      *websocket.Conn
-	send      chan []byte
-	respMutex sync.Mutex
+	relay *Relay
+	conn  *websocket.Conn
+	send  chan []byte
+	//respMutex sync.Mutex
 
 	ip          string
 	userAgent   string
@@ -101,15 +99,16 @@ func (client *Client) writer() {
 }
 
 // SendMessage ข้อความจาก relay เตรียมส่งไปยัง client
-func (client *Client) SendMessage(msg interface{}) error {
-	client.respMutex.Lock()
+func (client *Client) SendMessage(msg []byte) error {
+	/*client.respMutex.Lock()
 	defer client.respMutex.Unlock()
 
 	b, err := json.Marshal(&msg)
 	if err != nil {
 		return err
-	}
-	client.send <- b
+	}*/
+
+	client.send <- msg
 
 	return nil
 }
