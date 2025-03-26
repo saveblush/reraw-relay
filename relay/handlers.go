@@ -3,6 +3,7 @@ package relay
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -25,7 +26,7 @@ type service struct {
 
 	config *config.Configs
 	cctx   *cctx.Context
-	//mutex  sync.Mutex
+	mu     sync.Mutex
 
 	eventstore eventstore.Service
 

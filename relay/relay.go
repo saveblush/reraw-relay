@@ -78,10 +78,10 @@ func NewRelay() *Relay {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 
-		HandshakeTimeout:   180 * time.Second,
+		HandshakeTimeout:   360 * time.Second,
 		WriteWait:          10 * time.Second,
-		PongWait:           120 * time.Second,
-		PingPeriod:         60 * time.Second,
+		PongWait:           180 * time.Second,
+		PingPeriod:         90 * time.Second,
 		MessageLengthLimit: 0.5 * 1024 * 1024,
 	}
 
@@ -123,7 +123,6 @@ func (rl *Relay) ready() {
 		case client := <-rl.unregister:
 			if _, ok := rl.clients[client]; ok {
 				delete(rl.clients, client)
-				close(client.send)
 				logger.Log.Infof("[disconnect] %s", client.Info())
 			}
 		}
@@ -187,15 +186,11 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		relay:       rl,
 		conn:        conn,
-		send:        make(chan []byte),
 		ip:          utils.GetIP(r),
 		userAgent:   utils.GetUserAgent(r),
 		connectedAt: utils.Now(),
 	}
 	client.relay.register <- client
-
-	// เตรียมส่งข้อความกลับ
-	go client.writer()
 
 	// อ่านข้อความ
 	client.reader()

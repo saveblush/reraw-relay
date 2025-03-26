@@ -1,29 +1,23 @@
 package relay
 
 import (
-	"github.com/saveblush/reraw-relay/core/utils/logger"
+	"github.com/goccy/go-json"
+	"github.com/gorilla/websocket"
+
 	"github.com/saveblush/reraw-relay/models"
 )
 
 // websocket response
 func (s *service) response(msg interface{}) error {
-	/*s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	b, err := json.Marshal(&msg)
 	if err != nil {
 		return err
-	}*/
-
-	//return s.client.conn.WriteMessage(websocket.TextMessage, b)
-
-	err := s.client.SendMessage(msg)
-	if err != nil {
-		logger.Log.Errorf("write msg error: %s", err)
-		return err
 	}
 
-	return nil
+	return s.client.conn.WriteMessage(websocket.TextMessage, b)
 }
 
 func (s *service) responseEvent(subID string, evt *models.Event) error {
