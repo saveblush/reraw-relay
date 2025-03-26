@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 
 	"github.com/saveblush/reraw-relay/core/config"
@@ -89,17 +90,30 @@ func (client *Client) reader() {
 
 // writer ส่งข้อความจาก relay ไปยัง client
 func (client *Client) writer() {
-	for msg := range client.send {
+	/*for msg := range client.send {
 		err := client.conn.WriteMessage(websocket.TextMessage, msg)
 		if err != nil {
 			logger.Log.Errorf("write msg error: %s", err)
+			return
+		}
+	}*/
+
+	for msg := range client.send {
+		w, err := client.conn.NextWriter(websocket.TextMessage)
+		if err != nil {
+			return
+		}
+		w.Write(msg)
+
+		err = w.Close()
+		if err != nil {
 			return
 		}
 	}
 }
 
 // SendMessage ข้อความจาก relay เตรียมส่งไปยัง client
-func (client *Client) SendMessage(msg []byte) error {
+func (client *Client) SendMessage(msg interface{}) error {
 	/*client.respMutex.Lock()
 	defer client.respMutex.Unlock()
 
@@ -108,7 +122,16 @@ func (client *Client) SendMessage(msg []byte) error {
 		return err
 	}*/
 
-	client.send <- msg
+	b, _ := json.Marshal(msg)
+	client.send <- b
+
+	/*select {
+	case client.send <- b:
+	default:
+		logger.Log.Warn("client dropping message")
+	}*/
+
+	//client.send <- msg
 
 	return nil
 }
