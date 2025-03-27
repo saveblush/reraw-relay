@@ -58,7 +58,8 @@ func (s *service) handleEvent(msg []byte) error {
 	start := utils.Now()
 	defer func() { logger.Log.Infof("[%s] processed in %s", cmd, time.Since(start)) }()
 
-	if err := json.Unmarshal(msg, &req); err != nil {
+	err := json.Unmarshal(msg, &req)
+	if err != nil {
 		_ = s.responseError(errInvalidMessage.Error())
 		return errInvalidMessage
 	}

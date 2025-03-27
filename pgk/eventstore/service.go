@@ -19,6 +19,7 @@ type Service interface {
 	InsertBlacklist(c *cctx.Context, req *models.Blacklist) error
 	FindBlacklists(c *cctx.Context, req *models.Blacklist) ([]*models.Blacklist, error)
 	ClearEventsWithBlacklist(c *cctx.Context) error
+	ClearEventsExpiration(c *cctx.Context) error
 }
 
 type service struct {
@@ -118,7 +119,6 @@ func (s *service) FindPubkeyBlacklists(c *cctx.Context, req *models.Blacklist) (
 	}
 
 	return res, nil
-
 }
 
 func (s *service) ClearEventsWithBlacklist(c *cctx.Context) error {
@@ -145,6 +145,25 @@ func (s *service) ClearEventsWithBlacklist(c *cctx.Context) error {
 		err := s.repository.SoftDelete(c.GetDatabase(), &models.Event{ID: v.ID})
 		if err != nil {
 			logger.Log.Errorf("soft delete event with blacklist error: %s", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *service) ClearEventsExpiration(c *cctx.Context) error {
+	fetch, err := s.repository.FindEventsExpiration(c.GetDatabase())
+	if err != nil {
+		logger.Log.Errorf("find event with expiration error: %s", err)
+		return err
+	}
+
+	// delete event
+	for _, v := range fetch {
+		err := s.repository.SoftDelete(c.GetDatabase(), &models.Event{ID: v.ID})
+		if err != nil {
+			logger.Log.Errorf("soft delete event with expiration error: %s", err)
 			return err
 		}
 	}

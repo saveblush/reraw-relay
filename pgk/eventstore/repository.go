@@ -2,7 +2,6 @@ package eventstore
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	"gorm.io/gorm"
@@ -26,6 +25,7 @@ type Repository interface {
 	Delete(db *gorm.DB, req *models.Event) error
 	InsertBlacklist(db *gorm.DB, req *models.Blacklist) error
 	FindBlacklists(db *gorm.DB, req *models.Blacklist) ([]*models.Blacklist, error)
+	FindEventsExpiration(db *gorm.DB) ([]*models.Event, error)
 }
 
 type repository struct {
@@ -44,8 +44,9 @@ func (r *repository) query(req *Request) (string, []any, error) {
 	var conditions []string
 	var params []any
 
-	conditions = append(conditions, `(deleted_at IS NULL AND (CASE WHEN `+strconv.Itoa(int(utils.Now().Unix()))+` > expiration THEN 1 ELSE 0 END) = ?)`)
-	params = append(params, 0)
+	//conditions = append(conditions, `(deleted_at IS NULL AND (CASE WHEN `+strconv.Itoa(int(utils.Now().Unix()))+` > expiration THEN 1 ELSE 0 END) = ?)`)
+	//params = append(params, 0)
+	conditions = append(conditions, `(deleted_at IS NULL)`)
 
 	if len(req.NostrFilter.IDs) > 0 {
 		for _, v := range req.NostrFilter.IDs {
@@ -266,6 +267,18 @@ func (r *repository) queryFindBots(db *gorm.DB, req *models.Blacklist) *gorm.DB 
 func (r *repository) FindBlacklists(db *gorm.DB, req *models.Blacklist) ([]*models.Blacklist, error) {
 	entities := []*models.Blacklist{}
 	query := r.queryFindBots(db, req)
+	err := query.WithContext(r.ctx).Find(&entities).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return entities, nil
+}
+
+func (r *repository) FindEventsExpiration(db *gorm.DB) ([]*models.Event, error) {
+	entities := []*models.Event{}
+	query := db.Where("expiration < ?", utils.Now().Unix())
+	query.Where("deleted_at IS NULL")
 	err := query.WithContext(r.ctx).Find(&entities).Error
 	if err != nil {
 		return nil, err

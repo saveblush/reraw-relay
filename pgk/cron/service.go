@@ -42,6 +42,11 @@ func (s *service) Stop() {
 }
 
 func (s *service) schedule() {
+	// รันทุก 5 นาที
+	s.cron.AddFunc("*/5 * * * *", func() {
+		s.eventstore.ClearEventsExpiration(s.cctx)
+	})
+
 	// รันทุก 30 นาที
 	s.cron.AddFunc("*/30 * * * *", func() {
 		s.eventstore.ClearEventsWithBlacklist(s.cctx)
