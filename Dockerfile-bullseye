@@ -1,6 +1,6 @@
 # Define version
 ARG GO_VERSION=1.23.1
-FROM golang:${GO_VERSION}-alpine AS base
+FROM golang:${GO_VERSION}-bullseye AS base
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
@@ -15,12 +15,15 @@ ENV GOOS=linux
 # Build source code
 FROM base AS builder
 
-## Install apk
-RUN apk --no-cache add ca-certificates tzdata dumb-init
-
 ## Create user
-RUN addgroup -S gouser \
-    && adduser -S -u 10000 -g gouser gouser
+RUN adduser \
+  --disabled-password \
+  --gecos "" \
+  --home "/nonexistent" \
+  --shell "/sbin/nologin" \
+  --no-create-home \
+  --uid 65532 \
+  gouser
 
 ## Change ownership
 RUN mkdir /build
