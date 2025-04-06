@@ -31,19 +31,16 @@ WORKDIR /build
 
 ## Copy and download dependency using go mod
 COPY go.mod go.sum ./
-#RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download && go mod verify
-RUN go mod download && go mod verify
+RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go mod download && go mod verify
 
 ## Copy the source code into the container
 COPY . .
 
 ## Build app
-#RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
+RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
    #-ldflags="-X 'github.com/saveblush/reraw/version.Tag=$TAG'" \
-#   -ldflags="-w -s" \
-#   -o main .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-	go build -trimpath -ldflags '-s -w -extldflags "-static"' -o main .
+   -ldflags="-w -s" \
+   -o main .
 
 
 # Production, final image to reduce size
