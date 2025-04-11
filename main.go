@@ -27,7 +27,7 @@ func main() {
 	// Init configuration
 	err := config.InitConfig()
 	if err != nil {
-		logger.Log.Fatalf("init configuration error: %s", err)
+		logger.Log.Panicf("init configuration error: %s", err)
 	}
 
 	// Init connection database
@@ -43,7 +43,7 @@ func main() {
 	}
 	session, err := sql.InitConnection(cfdb)
 	if err != nil {
-		logger.Log.Fatalf("init connection db error: %s", err)
+		logger.Log.Panicf("init connection db error: %s", err)
 	}
 
 	// Set to global variable database
@@ -76,7 +76,7 @@ func main() {
 	go func() {
 		err = server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Log.Fatalf("App start error: %s", err)
+			logger.Log.Panicf("App start error: %s", err)
 		}
 	}()
 	logger.Log.Infof("App start on: %s", *addr)
@@ -103,7 +103,7 @@ func main() {
 
 	err = server.Shutdown(shutdownCtx)
 	if err != nil {
-		logger.Log.Fatalf("App shutdown error: %s", err)
+		logger.Log.Panicf("App shutdown error: %s", err)
 	}
 	logger.Log.Info("Gracefully shutting down")
 }

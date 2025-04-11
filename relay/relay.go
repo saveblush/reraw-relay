@@ -1,8 +1,10 @@
 package relay
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -19,6 +21,8 @@ import (
 	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
+
+var faviconBytes []byte
 
 var (
 	upgrader = websocket.Upgrader{
@@ -101,6 +105,7 @@ func NewRelay() *Relay {
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
 
+	rl.loadFavicon()
 	go rl.ready()
 
 	return rl
@@ -108,6 +113,7 @@ func NewRelay() *Relay {
 
 func (rl *Relay) Serve() *http.ServeMux {
 	mux := rl.serveMux
+	mux.HandleFunc("/favicon.ico", rl.handleFavicon)
 	mux.HandleFunc("/", rl.handleRequest)
 
 	return mux
@@ -224,7 +230,32 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 	str = append(str, fmt.Sprintf("PubKey: %s", rl.Info.Pubkey))
 	str = append(str, fmt.Sprintf("Contact: %s", rl.Info.Contact))
 	str = append(str, fmt.Sprintf("SupportedNIPs: %s", strings.Join(arrSupportedNIPs, ", ")))
+	str = append(str, fmt.Sprintf("Software: %s", rl.Info.Software))
 	str = append(str, fmt.Sprintf("Version: %s", rl.Info.Version))
 
-	fmt.Fprint(w, strings.Join(str, "\n"))
+	_, _ = w.Write([]byte(strings.Join(str, "\n")))
+}
+
+// handleFavicon handle favicon
+func (rl *Relay) handleFavicon(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/vnd.microsoft.icon")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	w.Write(faviconBytes)
+}
+
+// LoadFavicon load favicon
+func (rl *Relay) loadFavicon() {
+	if rl.Info.Icon == "" {
+		return
+	}
+
+	resp, err := http.Get(rl.Info.Icon)
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var buffer bytes.Buffer
+		if _, err = io.Copy(&buffer, resp.Body); err != nil {
+			return
+		}
+		faviconBytes = buffer.Bytes()
+	}
 }

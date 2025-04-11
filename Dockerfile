@@ -38,9 +38,8 @@ COPY . .
 
 ## Build app
 RUN GOARCH=$(echo "$TARGETPLATFORM" | cut -d'/' -f2) go build \
-   #-ldflags="-X 'github.com/saveblush/reraw/version.Tag=$TAG'" \
-   -ldflags="-w -s" \
-   -o main .
+  -ldflags="-X 'github.com/saveblush/reraw/version.Tag=$TAG'" \
+  -o main .
 
 
 # Production, final image to reduce size
