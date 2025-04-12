@@ -186,6 +186,7 @@ func (s *service) onReq(req []*json.RawMessage) error {
 	if err != nil {
 		return err
 	}
+	logger.Log.Infof("receive filters: ", *filters)
 
 	for idx, filter := range *filters {
 		// check reject
