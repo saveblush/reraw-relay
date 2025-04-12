@@ -76,6 +76,8 @@ func (client *Client) reader() {
 		}
 
 		go func(msg []byte) {
+			logger.Log.Infof("msg received: %s", msg)
+
 			err = rt.handleEvent(msg)
 			if err != nil {
 				logger.Log.Errorf("handle event error: %s", err)
