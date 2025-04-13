@@ -75,6 +75,12 @@ type Configs struct {
 		AvailableStatus string      // สถานะปิด/เปิดระบบ [on/off]
 		Port            int         `mapstructure:"PORT"`
 		Environment     Environment `mapstructure:"ENVIRONMENT"`
+		RateLimit       struct {
+			Limit         int  `mapstructure:"LIMIT"`
+			Burst         int  `mapstructure:"BURST"`
+			Enable        bool `mapstructure:"ENABLE"`
+			BlockIPEnable bool `mapstructure:"BLOCK_IP_ENABLE"`
+		} `mapstructure:"RATELIMIT"`
 	} `mapstructure:"APP"`
 
 	Database struct {

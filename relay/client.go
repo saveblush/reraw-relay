@@ -66,7 +66,7 @@ func (client *Client) reader() {
 		}
 
 		if mt != websocket.TextMessage {
-			logger.Log.Error("message is not UTF-8. %s disconnecting...", client.IP())
+			logger.Log.Errorf("message is not UTF-8. %s disconnecting...", client.IP())
 			break
 		}
 
@@ -75,8 +75,21 @@ func (client *Client) reader() {
 			continue
 		}
 
+		if client.relay.limiter != nil {
+			rate := client.relay.limiter.GetLimiter(client.IP())
+			if !rate.Allow() {
+				logger.Log.Infof("limiter %s disconnecting...", client.IP())
+				if config.CF.App.RateLimit.BlockIPEnable {
+					client.relay.mu.Lock()
+					client.relay.limiterBlockIPs[client.IP()] = true
+					client.relay.mu.Unlock()
+				}
+				break
+			}
+		}
+
 		go func(msg []byte) {
-			logger.Log.Infof("msg received: %s", msg)
+			logger.Log.Infof("[received] %s %s", client.IP(), msg)
 
 			err = rt.handleEvent(msg)
 			if err != nil {

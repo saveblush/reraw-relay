@@ -14,6 +14,11 @@ INFO:
 APP:
   PORT: 8070
   ENVIRONMENT: "prod" #develop, prod
+  RATELIMIT:
+    LIMIT: 30  # number of requests allowed per second
+    BURST: 5
+    ENABLE: true
+    BLOCK_IP_ENABLE: true
 
 DATABASE:
   RELAY_SQL:

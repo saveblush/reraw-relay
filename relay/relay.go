@@ -13,16 +13,16 @@ import (
 	"github.com/goccy/go-json"
 	"github.com/gorilla/websocket"
 	"github.com/jinzhu/copier"
+	"golang.org/x/time/rate"
 
 	"github.com/saveblush/reraw-relay/core/cctx"
 	"github.com/saveblush/reraw-relay/core/config"
 	"github.com/saveblush/reraw-relay/core/utils"
+	"github.com/saveblush/reraw-relay/core/utils/limiter"
 	"github.com/saveblush/reraw-relay/core/utils/logger"
 	"github.com/saveblush/reraw-relay/models"
 	"github.com/saveblush/reraw-relay/pgk/policies"
 )
-
-var faviconBytes []byte
 
 var (
 	upgrader = websocket.Upgrader{
@@ -62,8 +62,12 @@ type Relay struct {
 	register   chan *Client
 	unregister chan *Client
 
-	ServiceURL string
-	Info       *models.RelayInformationDocument
+	limiter         *limiter.IPRateLimiter
+	limiterBlockIPs map[string]bool
+
+	ServiceURL   string
+	Info         *models.RelayInformationDocument
+	faviconBytes []byte
 
 	HandshakeTimeout   time.Duration
 	WriteWait          time.Duration
@@ -81,6 +85,8 @@ func NewRelay() *Relay {
 		clients:    make(map[*Client]bool),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+
+		limiterBlockIPs: make(map[string]bool),
 
 		HandshakeTimeout:   360 * time.Second,
 		WriteWait:          10 * time.Second,
@@ -104,6 +110,11 @@ func NewRelay() *Relay {
 		rl.policies.RejectValidateTimeStamp,
 		rl.policies.RejectEventWithCharacter,
 		rl.policies.RejectEventFromPubkeyWithBlacklist)
+
+	// retelimit
+	if config.CF.App.RateLimit.Enable {
+		rl.limiter = limiter.NewIPRateLimiter(rate.Limit(config.CF.App.RateLimit.Limit), config.CF.App.RateLimit.Burst)
+	}
 
 	rl.loadFavicon()
 	go rl.ready()
@@ -177,6 +188,14 @@ func (rl *Relay) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 // handleWebsocket handle websocket
 func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
+	// limiter block ip
+	ip := utils.GetIP(r)
+	_, exists := rl.limiterBlockIPs[ip]
+	if exists {
+		logger.Log.Warnf("limiter block ip: %s", ip)
+		return
+	}
+
 	// ws
 	up := upgrader
 	up.HandshakeTimeout = rl.HandshakeTimeout
@@ -192,7 +211,7 @@ func (rl *Relay) handleWebsocket(w http.ResponseWriter, r *http.Request) {
 	client := &Client{
 		relay:       rl,
 		conn:        conn,
-		ip:          utils.GetIP(r),
+		ip:          ip,
 		userAgent:   utils.GetUserAgent(r),
 		connectedAt: utils.Now(),
 	}
@@ -238,10 +257,10 @@ func (rl *Relay) showInfo(w http.ResponseWriter) {
 
 // handleFavicon handle favicon
 func (rl *Relay) handleFavicon(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/vnd.microsoft.icon")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Content-Type", "image/x-icon")
+	w.Header().Set("Cache-Control", "public, max-age=7776000")
 
-	w.Write(faviconBytes)
+	_, _ = w.Write(rl.faviconBytes)
 }
 
 // LoadFavicon load favicon
@@ -256,6 +275,6 @@ func (rl *Relay) loadFavicon() {
 		if _, err = io.Copy(&buffer, resp.Body); err != nil {
 			return
 		}
-		faviconBytes = buffer.Bytes()
+		rl.faviconBytes = buffer.Bytes()
 	}
 }
